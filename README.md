@@ -2,7 +2,7 @@
 
 aws-cfg-generator is a CLI tool to generate configs for AWS helper tools based on an IAM user's permissions.
 
-To use this tool you need golang 1.16 or higher and aws-vault installed.
+To use this tool you need AWS credentials for an IAM user.
 
 ## Supported tools
 
