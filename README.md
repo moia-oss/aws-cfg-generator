@@ -2,7 +2,8 @@
 
 aws-cfg-generator is a CLI tool to generate configs for AWS helper tools based on an IAM user's permissions.
 
-To use this tool you need AWS credentials for an IAM user.
+To use this tool you need AWS credentials for an IAM user. This IAM user also needs sufficient permissions to read their
+own permission sets and group memberships.
 
 ## Supported tools
 
