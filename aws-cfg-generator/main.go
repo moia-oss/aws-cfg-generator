@@ -40,7 +40,7 @@ type VaultModel struct {
 }
 
 const vaultTemplate = `[profile {{.ProfileName}}]
-{{if (not (eq .Region "")) }}region={{.Region}}
+{{if (ne .Region "") }}region={{.Region}}
 {{end}}role_arn={{.RoleArn}}
 source_profile={{.SourceProfile}}
 input_profile={{.SourceProfile}}
