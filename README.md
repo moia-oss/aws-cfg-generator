@@ -41,8 +41,7 @@ include_profile=default
 #### Flags
 
 - `source-profile` Can be used to specify a source profile other than `default`
-- `region` Can be used to specify a region other than `eu-central-1`
-
+- `region` Can be used to specify a region other than the region in your source profile
 
 ### aws-extend-switch-roles
 
