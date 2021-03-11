@@ -232,15 +232,6 @@ func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
 
-	sess := session.Must(session.NewSession())
-	stsClient := sts.New(sess)
-
-	gcio, err := stsClient.GetCallerIdentity(&sts.GetCallerIdentityInput{})
-	if err != nil {
-		panic(err)
-	}
-
-	user := getUser(gcio.Arn)
 	var generatorFunc func(role string)
 
 	switch ctx.Command() {
@@ -255,6 +246,16 @@ func main() {
 	default:
 		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
 	}
+
+	sess := session.Must(session.NewSession())
+	stsClient := sts.New(sess)
+
+	gcio, err := stsClient.GetCallerIdentity(&sts.GetCallerIdentityInput{})
+	if err != nil {
+		panic(err)
+	}
+
+	user := getUser(gcio.Arn)
 
 	iamClient := iam.New(sess)
 
