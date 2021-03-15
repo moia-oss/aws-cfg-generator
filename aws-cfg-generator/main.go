@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/organizations"
 	"github.com/aws/aws-sdk-go/service/sts"
 )
 
@@ -71,7 +72,8 @@ type SwitchRolesCmd struct {
 
 type configCreator struct {
 	iamClient       *iam.IAM
-	generateProfile func(role string)
+	accountMap      map[string]string
+	generateProfile func(accountMap map[string]string, role string)
 }
 
 type PolicyDoc struct {
@@ -84,19 +86,26 @@ func getUser(userArn *string) *string {
 	return &arnParts[1]
 }
 
-func generateSwitchRolesProfile(role, color string) {
+func generateSwitchRolesProfile(accountMap map[string]string, role, color string) {
 	if !arn.IsARN(role) {
 		return
 	}
 
 	roleArn, _ := arn.Parse(role)
 
+	var profileName string
+	if name, ok := accountMap[roleArn.AccountID]; ok {
+		profileName = name
+	} else {
+		profileName = roleArn.AccountID
+	}
+
 	roleSplit := strings.Split(roleArn.Resource, "/")
 
-	fmt.Printf(switchRolesTemplate, roleArn.AccountID, roleArn.AccountID, roleSplit[1], color)
+	fmt.Printf(switchRolesTemplate, profileName, roleArn.AccountID, roleSplit[1], color)
 }
 
-func generateVaultProfile(role, region, sourceProfile string) {
+func generateVaultProfile(accountMap map[string]string, role, region, sourceProfile string) {
 	// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
 	if !arn.IsARN(role) {
 		return
@@ -106,9 +115,16 @@ func generateVaultProfile(role, region, sourceProfile string) {
 
 	t := template.Must(template.New("vaultText").Parse(vaultTemplate))
 
+	var profileName string
+	if name, ok := accountMap[roleArn.AccountID]; ok {
+		profileName = name
+	} else {
+		profileName = roleArn.AccountID
+	}
+
 	var b bytes.Buffer
 	err := t.Execute(&b, VaultModel{
-		ProfileName:   roleArn.AccountID,
+		ProfileName:   profileName,
 		Region:        region,
 		SourceProfile: sourceProfile,
 		RoleArn:       role,
@@ -158,14 +174,14 @@ func (cc *configCreator) statementHelper(polDoc PolicyDoc) {
 		}
 
 		if resStr, ok := statement["Resource"].(string); ok {
-			cc.generateProfile(resStr)
+			cc.generateProfile(cc.accountMap, resStr)
 			continue
 		}
 
 		if resArr, ok := statement["Resource"].([]interface{}); ok {
 			for _, res := range resArr {
 				if resStr, ok := res.(string); ok {
-					cc.generateProfile(resStr)
+					cc.generateProfile(cc.accountMap, resStr)
 				}
 			}
 		}
@@ -228,20 +244,46 @@ func (cc *configCreator) generateCfgsForGroup(group *iam.Group) {
 	}
 }
 
+func getAccountNames(orgClient *organizations.Organizations) map[string]string {
+	accIDToName := map[string]string{}
+
+	lai := &organizations.ListAccountsInput{}
+
+	for true {
+		lao, err := orgClient.ListAccounts(lai)
+		if err != nil {
+			// ignore error so script can be used without these permissions
+			break
+		}
+
+		for _, acc := range lao.Accounts {
+			accIDToName[*acc.Id] = *acc.Name
+		}
+
+		if lao.NextToken == nil {
+			break
+		}
+
+		lai.NextToken = lao.NextToken
+	}
+
+	return accIDToName
+}
+
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
 
-	var generatorFunc func(role string)
+	var generatorFunc func(accountMap map[string]string, role string)
 
 	switch ctx.Command() {
 	case "vault":
-		generatorFunc = func(role string) {
-			generateVaultProfile(role, cli.Vault.Region, cli.Vault.SourceProfile)
+		generatorFunc = func(accountMap map[string]string, role string) {
+			generateVaultProfile(accountMap, role, cli.Vault.Region, cli.Vault.SourceProfile)
 		}
 	case "switch-roles":
-		generatorFunc = func(role string) {
-			generateSwitchRolesProfile(role, cli.SwitchRoles.Color)
+		generatorFunc = func(accountMap map[string]string, role string) {
+			generateSwitchRolesProfile(accountMap, role, cli.SwitchRoles.Color)
 		}
 	default:
 		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
@@ -258,9 +300,11 @@ func main() {
 	user := getUser(gcio.Arn)
 
 	iamClient := iam.New(sess)
+	accMap := getAccountNames(organizations.New(sess))
 
 	cfgCreator := &configCreator{
 		iamClient:       iamClient,
+		accountMap:      accMap,
 		generateProfile: generatorFunc,
 	}
 
