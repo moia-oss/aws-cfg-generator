@@ -26,25 +26,22 @@ should look something like this:
 
 ```
 [profile 123456789098]
-region=eu-central-1
 role_arn=arn:aws:iam::123456789098:role/role-name
 source_profile=default
-mfa_serial=arn:aws:iam::111111111111:mfa/user-name@example.com
+include_profile=default
 
 [profile 098765432123]
-region=eu-central-1
 role_arn=arn:aws:iam::098765432123:role/role-name-two
 source_profile=default
-mfa_serial=arn:aws:iam::111111111111:mfa/user-name@example.com
+include_profile=default
 
-. . .
+[. . .]
 ```
 
 #### Flags
 
 - `source-profile` Can be used to specify a source profile other than `default`
-- `region` Can be used to specify a region other than `eu-central-1`
-
+- `region` Can be used to specify a region other than the region in your source profile
 
 ### aws-extend-switch-roles
 
@@ -74,7 +71,6 @@ color = 00ff7f
 - No human-readable profile names
 - Only recognizes policies that are attached to groups
 - Can only recognize explicit permissions (i.e. it doesn't work when the `Resource` is not a role ARN)
-- Assumes there's an MFA
   
 ## Planned features
 

@@ -14,10 +14,12 @@ package main
 */
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
+	"text/template"
 
 	"github.com/alecthomas/kong"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -30,11 +32,18 @@ const (
 	assumeAction = "sts:AssumeRole"
 )
 
-var vaultTemplate = `[profile %s]
-region=%s
-role_arn=%s
-source_profile=%s
-mfa_serial=arn:aws:iam::%s:mfa/%s
+type VaultModel struct {
+	ProfileName   string
+	Region        string
+	SourceProfile string
+	RoleArn       string
+}
+
+const vaultTemplate = `[profile {{.ProfileName}}]
+{{if (ne .Region "") }}region={{.Region}}
+{{end}}role_arn={{.RoleArn}}
+source_profile={{.SourceProfile}}
+input_profile={{.SourceProfile}}
 
 `
 
@@ -53,7 +62,7 @@ type CLI struct {
 
 type VaultCmd struct {
 	SourceProfile string `help:"The profile that your credentials should come from" default:"default"`
-	Region        string `help:"The AWS region each profile should set as default" default:"eu-central-1"`
+	Region        string `help:"Override the region configured with your source profile"`
 }
 
 type SwitchRolesCmd struct {
@@ -87,7 +96,7 @@ func generateSwitchRolesProfile(role, color string) {
 	fmt.Printf(switchRolesTemplate, roleArn.AccountID, roleArn.AccountID, roleSplit[1], color)
 }
 
-func generateVaultProfile(role, region, sourceProfile, rootAccount, user string) {
+func generateVaultProfile(role, region, sourceProfile string) {
 	// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
 	if !arn.IsARN(role) {
 		return
@@ -95,7 +104,20 @@ func generateVaultProfile(role, region, sourceProfile, rootAccount, user string)
 
 	roleArn, _ := arn.Parse(role)
 
-	fmt.Printf(vaultTemplate, roleArn.AccountID, region, role, sourceProfile, rootAccount, user)
+	t := template.Must(template.New("vaultText").Parse(vaultTemplate))
+
+	var b bytes.Buffer
+	err := t.Execute(&b, VaultModel{
+		ProfileName:   roleArn.AccountID,
+		Region:        region,
+		SourceProfile: sourceProfile,
+		RoleArn:       role,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Print(b.String())
 }
 
 func checkAction(action interface{}) bool {
@@ -210,6 +232,21 @@ func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
 
+	var generatorFunc func(role string)
+
+	switch ctx.Command() {
+	case "vault":
+		generatorFunc = func(role string) {
+			generateVaultProfile(role, cli.Vault.Region, cli.Vault.SourceProfile)
+		}
+	case "switch-roles":
+		generatorFunc = func(role string) {
+			generateSwitchRolesProfile(role, cli.SwitchRoles.Color)
+		}
+	default:
+		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
+	}
+
 	sess := session.Must(session.NewSession())
 	stsClient := sts.New(sess)
 
@@ -219,20 +256,6 @@ func main() {
 	}
 
 	user := getUser(gcio.Arn)
-	var generatorFunc func(role string)
-
-	switch ctx.Command() {
-	case "vault":
-		generatorFunc = func(role string) {
-			generateVaultProfile(role, cli.Vault.Region, cli.Vault.SourceProfile, *gcio.Account, *user)
-		}
-	case "switch-roles":
-		generatorFunc = func(role string) {
-			generateSwitchRolesProfile(role, cli.SwitchRoles.Color)
-		}
-	default:
-		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
-	}
 
 	iamClient := iam.New(sess)
 
