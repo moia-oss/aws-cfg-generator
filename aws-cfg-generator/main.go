@@ -249,7 +249,7 @@ func getAccountNames(orgClient *organizations.Organizations) map[string]string {
 
 	lai := &organizations.ListAccountsInput{}
 
-	for true {
+	for {
 		lao, err := orgClient.ListAccounts(lai)
 		if err != nil {
 			// ignore error so script can be used without these permissions
