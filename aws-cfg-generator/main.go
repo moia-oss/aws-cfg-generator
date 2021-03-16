@@ -14,12 +14,10 @@ package main
 */
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
-	"text/template"
 
 	"github.com/alecthomas/kong"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -27,33 +25,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/organizations"
 	"github.com/aws/aws-sdk-go/service/sts"
+
+	"gopkg.in/ini.v1"
 )
 
 const (
 	assumeAction = "sts:AssumeRole"
 )
-
-type VaultModel struct {
-	ProfileName   string
-	Region        string
-	SourceProfile string
-	RoleArn       string
-}
-
-const vaultTemplate = `[profile {{.ProfileName}}]
-{{if (ne .Region "") }}region={{.Region}}
-{{end}}role_arn={{.RoleArn}}
-source_profile={{.SourceProfile}}
-include_profile={{.SourceProfile}}
-
-`
-
-var switchRolesTemplate = `[%s]
-aws_account_id = %s
-role_name = %s
-color = %s
-
-`
 
 // nolint:govet // we need the bare `cmd` tag here
 type CLI struct {
@@ -61,13 +39,19 @@ type CLI struct {
 	SwitchRoles SwitchRolesCmd `cmd help:"generates a config for aws-extend-switch-roles"`
 }
 
+// nolint:govet // we need the bare `required` tag here
 type VaultCmd struct {
-	SourceProfile string `help:"The profile that your credentials should come from" default:"default"`
-	Region        string `help:"Override the region configured with your source profile"`
+	SourceProfile        string `help:"The profile that your credentials should come from" default:"default"`
+	Region               string `help:"Override the region configured with your source profile"`
+	VaultConfigPath      string `help:"Where to load/save the config" required`
+	UseRoleNameInProfile bool   `help:"Append the role name to the profile name" default:false`
 }
 
+// nolint:govet // we need the bare `required` tag here
 type SwitchRolesCmd struct {
-	Color string `help:"The hexcode color that should be set for each profile" default:"00ff7f"`
+	Color                string `help:"The hexcode color that should be set for each profile" default:"00ff7f"`
+	OutputFile           string `help:"Where to save the config." required`
+	UseRoleNameInProfile bool   `help:"Append the role name to the profile name" default:false`
 }
 
 type configCreator struct {
@@ -84,57 +68,96 @@ func getUser(userArn *string) *string {
 	return &arnParts[1]
 }
 
-func generateSwitchRolesProfile(accountMap map[string]string, roleArns []string, color string) {
-	for _, role := range roleArns {
-		if !arn.IsARN(role) {
+func getProfileAndRoleName(accountMap map[string]string, role arn.ARN, useRoleName bool) (profileName string, roleName string) {
+	if name, ok := accountMap[role.AccountID]; ok {
+		profileName = name
+	} else {
+		profileName = role.AccountID
+	}
+
+	roleName = strings.Replace(role.Resource, "role/", "", 1)
+
+	if useRoleName {
+		profileName = fmt.Sprint(profileName, "_", roleName)
+	}
+
+	return
+}
+
+func generateSwitchRolesProfile(accountMap map[string]string, roleArns []string, cmd SwitchRolesCmd) {
+	config := ini.Empty()
+
+	for _, roleArn := range roleArns {
+		if !arn.IsARN(roleArn) {
 			return
 		}
 
-		roleArn, _ := arn.Parse(role)
+		role, _ := arn.Parse(roleArn)
 
-		var profileName string
-		if name, ok := accountMap[roleArn.AccountID]; ok {
-			profileName = name
-		} else {
-			profileName = roleArn.AccountID
+		profileName, roleName := getProfileAndRoleName(accountMap, role, cmd.UseRoleNameInProfile)
+
+		profileSection := config.Section(profileName)
+
+		newKey := func(key string, value string) {
+			_, err := profileSection.NewKey(key, value)
+			if err != nil {
+				panic(err)
+			}
 		}
 
-		roleSplit := strings.Split(roleArn.Resource, "/")
+		newKey("aws_account_id", role.AccountID)
+		newKey("role_name", roleName)
+		newKey("color", cmd.Color)
+	}
 
-		fmt.Printf(switchRolesTemplate, profileName, roleArn.AccountID, roleSplit[1], color)
+	err := config.SaveTo(cmd.OutputFile)
+
+	if err != nil {
+		panic(err)
 	}
 }
 
-func generateVaultProfile(accountMap map[string]string, roleArns []string, region, sourceProfile string) {
-	for _, role := range roleArns {
+func generateVaultProfile(accountMap map[string]string, roleArns []string, cmd VaultCmd) {
+	config, err := ini.Load(cmd.VaultConfigPath)
+
+	if err != nil {
+		panic(err)
+	}
+
+	for _, roleArn := range roleArns {
 		// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
-		if !arn.IsARN(role) {
+		if !arn.IsARN(roleArn) {
 			return
 		}
 
-		roleArn, _ := arn.Parse(role)
+		role, _ := arn.Parse(roleArn)
 
-		t := template.Must(template.New("vaultText").Parse(vaultTemplate))
+		profileName, _ := getProfileAndRoleName(accountMap, role, cmd.UseRoleNameInProfile)
 
-		var profileName string
-		if name, ok := accountMap[roleArn.AccountID]; ok {
-			profileName = name
-		} else {
-			profileName = roleArn.AccountID
+		sectionName := fmt.Sprint("profile ", profileName)
+
+		profileSection := config.Section(sectionName)
+
+		newKey := func(key string, value string) {
+			_, err := profileSection.NewKey(key, value)
+			if err != nil {
+				panic(err)
+			}
 		}
 
-		var b bytes.Buffer
-		err := t.Execute(&b, VaultModel{
-			ProfileName:   profileName,
-			Region:        region,
-			SourceProfile: sourceProfile,
-			RoleArn:       role,
-		})
-		if err != nil {
-			panic(err)
-		}
+		newKey("role_arn", roleArn)
+		newKey("source_profile", cmd.SourceProfile)
+		newKey("include_profile", cmd.SourceProfile)
 
-		fmt.Print(b.String())
+		if cmd.Region != "" {
+			newKey("region", cmd.Region)
+		}
+	}
+
+	err = config.SaveTo(cmd.VaultConfigPath)
+
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -280,11 +303,11 @@ func main() {
 	switch ctx.Command() {
 	case "vault":
 		generatorFunc = func(accountMap map[string]string, roleArns []string) {
-			generateVaultProfile(accountMap, roleArns, cli.Vault.Region, cli.Vault.SourceProfile)
+			generateVaultProfile(accountMap, roleArns, cli.Vault)
 		}
 	case "switch-roles":
 		generatorFunc = func(accountMap map[string]string, roleArns []string) {
-			generateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles.Color)
+			generateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles)
 		}
 	default:
 		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
