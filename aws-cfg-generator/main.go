@@ -71,9 +71,7 @@ type SwitchRolesCmd struct {
 }
 
 type configCreator struct {
-	iamClient       *iam.IAM
-	accountMap      map[string]string
-	generateProfile func(accountMap map[string]string, role string)
+	iamClient *iam.IAM
 }
 
 type PolicyDoc struct {
@@ -86,54 +84,58 @@ func getUser(userArn *string) *string {
 	return &arnParts[1]
 }
 
-func generateSwitchRolesProfile(accountMap map[string]string, role, color string) {
-	if !arn.IsARN(role) {
-		return
+func generateSwitchRolesProfile(accountMap map[string]string, roleArns []string, color string) {
+	for _, role := range roleArns {
+		if !arn.IsARN(role) {
+			return
+		}
+
+		roleArn, _ := arn.Parse(role)
+
+		var profileName string
+		if name, ok := accountMap[roleArn.AccountID]; ok {
+			profileName = name
+		} else {
+			profileName = roleArn.AccountID
+		}
+
+		roleSplit := strings.Split(roleArn.Resource, "/")
+
+		fmt.Printf(switchRolesTemplate, profileName, roleArn.AccountID, roleSplit[1], color)
 	}
-
-	roleArn, _ := arn.Parse(role)
-
-	var profileName string
-	if name, ok := accountMap[roleArn.AccountID]; ok {
-		profileName = name
-	} else {
-		profileName = roleArn.AccountID
-	}
-
-	roleSplit := strings.Split(roleArn.Resource, "/")
-
-	fmt.Printf(switchRolesTemplate, profileName, roleArn.AccountID, roleSplit[1], color)
 }
 
-func generateVaultProfile(accountMap map[string]string, role, region, sourceProfile string) {
-	// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
-	if !arn.IsARN(role) {
-		return
+func generateVaultProfile(accountMap map[string]string, roleArns []string, region, sourceProfile string) {
+	for _, role := range roleArns {
+		// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
+		if !arn.IsARN(role) {
+			return
+		}
+
+		roleArn, _ := arn.Parse(role)
+
+		t := template.Must(template.New("vaultText").Parse(vaultTemplate))
+
+		var profileName string
+		if name, ok := accountMap[roleArn.AccountID]; ok {
+			profileName = name
+		} else {
+			profileName = roleArn.AccountID
+		}
+
+		var b bytes.Buffer
+		err := t.Execute(&b, VaultModel{
+			ProfileName:   profileName,
+			Region:        region,
+			SourceProfile: sourceProfile,
+			RoleArn:       role,
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Print(b.String())
 	}
-
-	roleArn, _ := arn.Parse(role)
-
-	t := template.Must(template.New("vaultText").Parse(vaultTemplate))
-
-	var profileName string
-	if name, ok := accountMap[roleArn.AccountID]; ok {
-		profileName = name
-	} else {
-		profileName = roleArn.AccountID
-	}
-
-	var b bytes.Buffer
-	err := t.Execute(&b, VaultModel{
-		ProfileName:   profileName,
-		Region:        region,
-		SourceProfile: sourceProfile,
-		RoleArn:       role,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Print(b.String())
 }
 
 func checkAction(action interface{}) bool {
@@ -152,43 +154,43 @@ func checkAction(action interface{}) bool {
 	return false
 }
 
-func getPolicyDocument(policyJSON *string) PolicyDoc {
+func getRolesArnsFromPolicy(policyJSON *string) (roles []string) {
 	policyJson, err := url.QueryUnescape(*policyJSON)
+
 	if err != nil {
 		panic(err)
 	}
 
 	var policyDoc PolicyDoc
+
 	err = json.Unmarshal([]byte(policyJson), &policyDoc)
 	if err != nil {
 		panic(err)
 	}
 
-	return policyDoc
-}
-
-func (cc *configCreator) statementHelper(polDoc PolicyDoc) {
-	for _, statement := range polDoc.Statement {
+	for _, statement := range policyDoc.Statement {
 		if effStr, ok := statement["Effect"].(string); (ok && effStr != "Allow") || !checkAction(statement["Action"]) {
 			continue
 		}
 
 		if resStr, ok := statement["Resource"].(string); ok {
-			cc.generateProfile(cc.accountMap, resStr)
+			roles = append(roles, resStr)
 			continue
 		}
 
 		if resArr, ok := statement["Resource"].([]interface{}); ok {
 			for _, res := range resArr {
 				if resStr, ok := res.(string); ok {
-					cc.generateProfile(cc.accountMap, resStr)
+					roles = append(roles, resStr)
 				}
 			}
 		}
 	}
+
+	return
 }
 
-func (cc *configCreator) generateCfgForInlinePolicy(group, policyName *string) {
+func (cc *configCreator) getRoleArnsForInlinePolicy(group, policyName *string) []string {
 	ggpo, err := cc.iamClient.GetGroupPolicy(&iam.GetGroupPolicyInput{
 		GroupName:  group,
 		PolicyName: policyName,
@@ -197,11 +199,10 @@ func (cc *configCreator) generateCfgForInlinePolicy(group, policyName *string) {
 		panic(err)
 	}
 
-	policyDoc := getPolicyDocument(ggpo.PolicyDocument)
-	cc.statementHelper(policyDoc)
+	return getRolesArnsFromPolicy(ggpo.PolicyDocument)
 }
 
-func (cc *configCreator) generateCfgsForAttachedPolicy(policy *iam.AttachedPolicy) {
+func (cc *configCreator) getRoleArnsForAttachedPolicy(policy *iam.AttachedPolicy) []string {
 	gpio, err := cc.iamClient.GetPolicy(&iam.GetPolicyInput{
 		PolicyArn: policy.PolicyArn,
 	})
@@ -217,20 +218,18 @@ func (cc *configCreator) generateCfgsForAttachedPolicy(policy *iam.AttachedPolic
 		panic(err)
 	}
 
-	policyDoc := getPolicyDocument(gpvio.PolicyVersion.Document)
-	cc.statementHelper(policyDoc)
+	return getRolesArnsFromPolicy(gpvio.PolicyVersion.Document)
 }
 
-func (cc *configCreator) generateCfgsForGroup(group *iam.Group) {
+func (cc *configCreator) getRoleArnsForGroup(group *iam.Group) (roles []string) {
 	lgpo, err := cc.iamClient.ListGroupPolicies(&iam.ListGroupPoliciesInput{
 		GroupName: group.GroupName,
 	})
 	if err != nil {
 		panic(err)
 	}
-
 	for _, policy := range lgpo.PolicyNames {
-		cc.generateCfgForInlinePolicy(group.GroupName, policy)
+		roles = append(roles, cc.getRoleArnsForInlinePolicy(group.GroupName, policy)...)
 	}
 
 	lagpo, err := cc.iamClient.ListAttachedGroupPolicies(&iam.ListAttachedGroupPoliciesInput{
@@ -240,8 +239,10 @@ func (cc *configCreator) generateCfgsForGroup(group *iam.Group) {
 		panic(err)
 	}
 	for _, policy := range lagpo.AttachedPolicies {
-		cc.generateCfgsForAttachedPolicy(policy)
+		roles = append(roles, cc.getRoleArnsForAttachedPolicy(policy)...)
 	}
+
+	return
 }
 
 func getAccountNames(orgClient *organizations.Organizations) map[string]string {
@@ -274,16 +275,16 @@ func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
 
-	var generatorFunc func(accountMap map[string]string, role string)
+	var generatorFunc func(accountMap map[string]string, roleArns []string)
 
 	switch ctx.Command() {
 	case "vault":
-		generatorFunc = func(accountMap map[string]string, role string) {
-			generateVaultProfile(accountMap, role, cli.Vault.Region, cli.Vault.SourceProfile)
+		generatorFunc = func(accountMap map[string]string, roleArns []string) {
+			generateVaultProfile(accountMap, roleArns, cli.Vault.Region, cli.Vault.SourceProfile)
 		}
 	case "switch-roles":
-		generatorFunc = func(accountMap map[string]string, role string) {
-			generateSwitchRolesProfile(accountMap, role, cli.SwitchRoles.Color)
+		generatorFunc = func(accountMap map[string]string, roleArns []string) {
+			generateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles.Color)
 		}
 	default:
 		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
@@ -303,9 +304,7 @@ func main() {
 	accMap := getAccountNames(organizations.New(sess))
 
 	cfgCreator := &configCreator{
-		iamClient:       iamClient,
-		accountMap:      accMap,
-		generateProfile: generatorFunc,
+		iamClient: iamClient,
 	}
 
 	lgfuo, err := iamClient.ListGroupsForUser(&iam.ListGroupsForUserInput{
@@ -315,7 +314,11 @@ func main() {
 		panic(err)
 	}
 
+	var roleArns []string
+
 	for _, group := range lgfuo.Groups {
-		cfgCreator.generateCfgsForGroup(group)
+		roleArns = append(roleArns, cfgCreator.getRoleArnsForGroup(group)...)
 	}
+
+	generatorFunc(accMap, roleArns)
 }

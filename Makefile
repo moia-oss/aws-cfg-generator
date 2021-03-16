@@ -12,6 +12,11 @@ GOLANGCI_LINT_VERSION := 1.38.0
 lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 	$(GO_PREFIX) ./bin/golangci-lint-$(GOLANGCI_LINT_VERSION) run $(LINT_TARGETS)
 
+# Format all code
+.PHONY: format
+format:
+	gofmt -s -w ./aws-cfg-generator/
+
 .PHONY: create-golint-config
 create-golint-config: .golangci.yml
 
