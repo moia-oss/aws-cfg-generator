@@ -3,7 +3,14 @@
 aws-cfg-generator is a CLI tool to generate configs for AWS helper tools based on an IAM user's permissions.
 
 To use this tool you need AWS credentials for an IAM user. This IAM user also needs sufficient permissions to read their
-own permission sets and group memberships.
+own permission sets and group memberships. 
+
+## Profile names
+
+In order to name profiles correctly, aws-cfg-generator will attempt to call `organizations.ListAccounts` and match that
+with account IDs in the roles the user has access to. If the user has permissions for a role not in the same AWS
+organization the profile will be named by the account ID instead. Similarly, if the user lacks permissions to list the
+organization's accounts, the profiles will be named by account IDs as well,
 
 ## Supported tools
 
@@ -25,12 +32,12 @@ aws-vault for every profile you're explicitly allowed to assume. Run `cat ~/.aws
 should look something like this:
 
 ```
-[profile 123456789098]
+[profile account-name]
 role_arn=arn:aws:iam::123456789098:role/role-name
 source_profile=default
 include_profile=default
 
-[profile 098765432123]
+[profile another-account-name]
 role_arn=arn:aws:iam::098765432123:role/role-name-two
 source_profile=default
 include_profile=default
@@ -49,12 +56,12 @@ Run `aws-vault exec default -- ./aws-cfg-generator switch-roles` to write your c
 it into your aws-extend-switch-roles settings page. The generated config should look something like this:
 
 ```
-[123456789098]
+[account-name]
 aws_account_id = 123456789098
 role_name = example-role
 color = 00ff7f
 
-[098765432123]
+[another-account-name]
 aws_account_id = 098765432123
 role_name = example-role-two
 color = 00ff7f
@@ -68,13 +75,11 @@ color = 00ff7f
 
 ## Known-limitations
 
-- No human-readable profile names
 - Only recognizes policies that are attached to groups
 - Can only recognize explicit permissions (i.e. it doesn't work when the `Resource` is not a role ARN)
   
 ## Planned features
 
-- Human-readable names configurable via a provided mapping from AWS account IDs to names
 - Discover roles that are attached or inlined directly on the user
 
 ## Contributions
