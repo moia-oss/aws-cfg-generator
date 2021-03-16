@@ -44,7 +44,7 @@ const vaultTemplate = `[profile {{.ProfileName}}]
 {{if (ne .Region "") }}region={{.Region}}
 {{end}}role_arn={{.RoleArn}}
 source_profile={{.SourceProfile}}
-input_profile={{.SourceProfile}}
+include_profile={{.SourceProfile}}
 
 `
 
