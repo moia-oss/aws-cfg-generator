@@ -3,11 +3,11 @@ package gen
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
 	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/util"
 	"gopkg.in/ini.v1"
 )
+
 
 func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOptions cmd.VaultCmd) {
 	config, err := ini.Load(cmdOptions.VaultConfigPath)
@@ -24,46 +24,30 @@ func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOp
 	}
 
 	// make sure the source section exists
-	sourceProfileSection, err := config.GetSection(sourceProfileSectionName)
-
+	_, err = config.GetSection(sourceProfileSectionName)
 	if err != nil {
 		panic(err)
 	}
 
-	// only copy the source profile, discard the rest of the config
+	// only copy the source profile and generated profiles, discard the rest of the config
 	if !cmdOptions.KeepCustomConfig {
-		config = ini.Empty()
+		newConfig := ini.Empty()
+		
+		setProfileKey := util.GetKeySetter(newConfig.Section(sourceProfileSectionName))
 
-		newSourceProfileSection, err := config.NewSection(sourceProfileSectionName)
-
-		if err != nil {
-			panic(err)
+		for key, value := range config.Section(sourceProfileSectionName).KeysHash() {
+			setProfileKey(key, value)
 		}
 
-		setKey := util.GetKeySetter(newSourceProfileSection)
-
-		for key, value := range sourceProfileSection.KeysHash() {
-			setKey(key, value)
-		}
+		config = newConfig
 	}
 
-	for _, roleArn := range roleArns {
-		// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
-		if !arn.IsARN(roleArn) {
-			return
-		}
-
-		role, _ := arn.Parse(roleArn)
-
-		profileName, _ := util.GetProfileAndRoleName(accountMap, role, cmdOptions.UseRoleNameInProfile)
-
-		sectionName := fmt.Sprint("profile ", profileName)
-
-		profileSection := config.Section(sectionName)
+	for _, profile := range util.GetProfiles("profile ", accountMap, roleArns, cmdOptions.UseRoleNameInProfile) {
+		profileSection := config.Section(profile.ProfileName)
 
 		setKey := util.GetKeySetter(profileSection)
 
-		setKey("role_arn", roleArn)
+		setKey("role_arn", profile.RoleArn)
 		setKey("source_profile", cmdOptions.SourceProfile)
 		setKey("include_profile", cmdOptions.SourceProfile)
 
@@ -78,3 +62,4 @@ func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOp
 		panic(err)
 	}
 }
+

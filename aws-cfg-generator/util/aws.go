@@ -63,7 +63,37 @@ func (ctx *AWSContext) GetRolesAndAccounts() (roleArns []string, accountMap map[
 	return
 }
 
-func GetProfileAndRoleName(accountMap map[string]string, role arn.ARN, useRoleName bool) (profileName string, roleName string) {
+type Profile struct {
+	RoleArn string
+	RoleName string
+	ProfileName string
+	AccountID string
+}
+
+func GetProfiles(prefix string, accountMap map[string]string, roleArns []string, useRoleName bool) []Profile {
+	var profiles []Profile
+	
+	for _, roleArn := range roleArns {
+		// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
+		if !arn.IsARN(roleArn) {
+			continue
+		}
+
+		role, _ := arn.Parse(roleArn)
+		profileName, roleName := getProfileAndRoleName(accountMap, role, useRoleName)
+
+		profiles = append(profiles, Profile{
+			RoleArn: roleArn,
+			RoleName: roleName,
+			ProfileName: fmt.Sprint(prefix, profileName),
+			AccountID: role.AccountID,
+		})
+	}
+
+	return profiles
+}
+
+func getProfileAndRoleName(accountMap map[string]string, role arn.ARN, useRoleName bool) (profileName string, roleName string) {
 	if name, ok := accountMap[role.AccountID]; ok {
 		profileName = name
 	} else {
