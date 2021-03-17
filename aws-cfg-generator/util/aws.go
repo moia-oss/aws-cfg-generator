@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -122,12 +124,14 @@ func (ctx *AWSContext) getAccountNames() map[string]string {
 	for {
 		lao, err := ctx.org.ListAccounts(lai)
 		if err != nil {
+			log.Warn().Err(err).Msg("could not list organization member accounts")
 			// ignore error so script can be used without these permissions
 			break
 		}
 
 		for _, acc := range lao.Accounts {
 			accIDToName[*acc.Id] = *acc.Name
+			log.Debug().Str("account ID", *acc.Id).Str("account name", *acc.Name).Msg("found organization member account")
 		}
 
 		if lao.NextToken == nil {

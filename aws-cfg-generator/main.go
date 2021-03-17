@@ -16,7 +16,10 @@ package main
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/alecthomas/kong"
+
 	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
 	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/gen"
 	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/util"
@@ -26,11 +29,18 @@ import (
 type CLI struct {
 	Vault       cmd.VaultCmd       `cmd help:"generates a config for aws-vault"`
 	SwitchRoles cmd.SwitchRolesCmd `cmd help:"generates a config for aws-extend-switch-roles"`
+	Debug       bool               `help:"set the log level to debug" default:false`
 }
 
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
+
+	if cli.Debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
 
 	switch ctx.Command() {
 	case "vault":
@@ -40,7 +50,6 @@ func main() {
 	case "switch-roles":
 		roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts()
 		gen.GenerateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles)
-
 	default:
 		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
 	}
