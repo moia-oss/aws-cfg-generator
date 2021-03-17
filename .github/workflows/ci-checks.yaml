@@ -1,23 +1,13 @@
-name: "CI checks"
-
-on:
-  push
-
+name: CI checks
+on: push
 jobs:
-  lint-build:
-    name: "Lint and built"
-    runs-on: "ubuntu-latest"
-
+  lint-build-test:
+    runs-on: ubuntu-latest
     steps:
-      - name: "checkout"
-        uses: "actions/checkout@v2"
-
+      - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: '^1.16'
-
-      - name: lint
-        run: make lint
-
-      - name: build
-        run: make build
+          go-version: ^1.16
+      - run: make lint
+      - run: make build
+      - run: make test
