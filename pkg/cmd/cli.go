@@ -1,4 +1,4 @@
-package main
+package cmd
 
 /*
    Copyright 2021 MOIA GmbH
@@ -13,26 +13,9 @@ package main
    limitations under the License.
 */
 
-import (
-	"github.com/alecthomas/kong"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-
-	"github.com/moia-oss/aws-cfg-generator/pkg/cmd"
-)
-
-func main() {
-	var cli cmd.CLI
-	ctx := kong.Parse(&cli)
-
-	if cli.Debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	}
-
-	err := ctx.Run(cli)
-	if err != nil {
-		log.Panic().Err(err).Msgf("unexpected CLI error")
-	}
+// nolint:govet // we need the bare `cmd` tag here
+type CLI struct {
+	Vault       VaultCmd       `cmd help:"generates a config for aws-vault"`
+	SwitchRoles SwitchRolesCmd `cmd help:"generates a config for aws-extend-switch-roles"`
+	Debug       bool           `help:"set the log level to debug" default:false`
 }

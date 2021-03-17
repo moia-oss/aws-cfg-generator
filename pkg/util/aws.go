@@ -1,10 +1,25 @@
 package util
 
+/*
+   Copyright 2021 MOIA GmbH
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 import (
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -46,17 +61,20 @@ func (ctx *AWSContext) GetRolesAndAccounts() (roleArns []string, accountMap map[
 
 	gcio, err := ctx.sts.GetCallerIdentity(&sts.GetCallerIdentityInput{})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Msg("could not get caller identity")
 	}
+
+	log.Info().Str("user-arn", *gcio.Arn).Msg("Found user")
 
 	lgfuo, err := ctx.iam.ListGroupsForUser(&iam.ListGroupsForUserInput{
 		UserName: getUser(gcio.Arn),
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("user", *getUser(gcio.Arn)).Msg("could not list groups for user")
 	}
 
 	for _, group := range lgfuo.Groups {
+		log.Debug().Str("group", *group.GroupName).Msg("Finding roles for group")
 		roleArns = append(roleArns, ctx.getRoleArnsForGroup(group)...)
 	}
 
@@ -122,12 +140,15 @@ func (ctx *AWSContext) getAccountNames() map[string]string {
 	for {
 		lao, err := ctx.org.ListAccounts(lai)
 		if err != nil {
+			log.Warn().Err(err).Msg("could not list organization member accounts")
 			// ignore error so script can be used without these permissions
 			break
 		}
 
 		for _, acc := range lao.Accounts {
 			accIDToName[*acc.Id] = *acc.Name
+			log.Debug().Str("account-id", *acc.Id).Str("account-name", *acc.Name).
+				Msg("found organization member account")
 		}
 
 		if lao.NextToken == nil {
@@ -145,9 +166,10 @@ func (ctx *AWSContext) getRoleArnsForGroup(group *iam.Group) (roles []string) {
 		GroupName: group.GroupName,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("group", *group.GroupName).Msg("could not list inline group policies")
 	}
 	for _, policy := range lgpo.PolicyNames {
+		log.Debug().Str("policy", *policy).Msg("Finding roles for inlined policy")
 		roles = append(roles, ctx.getRoleArnsForInlinePolicy(group.GroupName, policy)...)
 	}
 
@@ -155,9 +177,10 @@ func (ctx *AWSContext) getRoleArnsForGroup(group *iam.Group) (roles []string) {
 		GroupName: group.GroupName,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("group", *group.GroupName).Msg("could not list attached group policies")
 	}
 	for _, policy := range lagpo.AttachedPolicies {
+		log.Debug().Str("policy ARN", *policy.PolicyArn).Msg("Finding roles for attached policy")
 		roles = append(roles, ctx.getRoleArnsForAttachedPolicy(policy)...)
 	}
 
@@ -170,7 +193,7 @@ func (ctx *AWSContext) getRoleArnsForInlinePolicy(group, policyName *string) []s
 		PolicyName: policyName,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Msg("could not get group policy")
 	}
 
 	return getRolesArnsFromPolicy(ggpo.PolicyDocument)
@@ -181,7 +204,7 @@ func (ctx *AWSContext) getRoleArnsForAttachedPolicy(policy *iam.AttachedPolicy) 
 		PolicyArn: policy.PolicyArn,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("policy-arn", *policy.PolicyArn).Msg("could not get policy")
 	}
 
 	gpvio, err := ctx.iam.GetPolicyVersion(&iam.GetPolicyVersionInput{
@@ -189,7 +212,9 @@ func (ctx *AWSContext) getRoleArnsForAttachedPolicy(policy *iam.AttachedPolicy) 
 		VersionId: gpio.Policy.DefaultVersionId,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).
+			Str("policy", *policy.PolicyArn).Str("version-id", *gpio.Policy.DefaultVersionId).
+			Msg("could not get policy version")
 	}
 
 	return getRolesArnsFromPolicy(gpvio.PolicyVersion.Document)
@@ -197,16 +222,15 @@ func (ctx *AWSContext) getRoleArnsForAttachedPolicy(policy *iam.AttachedPolicy) 
 
 func getRolesArnsFromPolicy(policyJSON *string) (roles []string) {
 	policyJson, err := url.QueryUnescape(*policyJSON)
-
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Msg("could not unescape policy JSON")
 	}
 
 	var policyDoc PolicyDoc
 
 	err = json.Unmarshal([]byte(policyJson), &policyDoc)
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Msg("could not unmarshall policy JSON")
 	}
 
 	for _, statement := range policyDoc.Statement {
@@ -215,6 +239,7 @@ func getRolesArnsFromPolicy(policyJSON *string) (roles []string) {
 		}
 
 		if resStr, ok := statement["Resource"].(string); ok {
+			log.Debug().Str("role", resStr).Msg("found assumable role")
 			roles = append(roles, resStr)
 			continue
 		}
@@ -222,6 +247,7 @@ func getRolesArnsFromPolicy(policyJSON *string) (roles []string) {
 		if resArr, ok := statement["Resource"].([]interface{}); ok {
 			for _, res := range resArr {
 				if resStr, ok := res.(string); ok {
+					log.Debug().Str("role", resStr).Msg("found assumable role")
 					roles = append(roles, resStr)
 				}
 			}

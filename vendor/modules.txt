@@ -50,6 +50,14 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/jmespath/go-jmespath
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
+# github.com/rs/zerolog v1.20.0
+## explicit
+github.com/rs/zerolog
+github.com/rs/zerolog/internal/cbor
+github.com/rs/zerolog/internal/json
+github.com/rs/zerolog/log
+# github.com/smartystreets/goconvey v1.6.4
+## explicit
 # gopkg.in/ini.v1 v1.62.0
 ## explicit
 gopkg.in/ini.v1

@@ -1,4 +1,4 @@
-package main
+package util
 
 /*
    Copyright 2021 MOIA GmbH
@@ -14,25 +14,17 @@ package main
 */
 
 import (
-	"github.com/alecthomas/kong"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/moia-oss/aws-cfg-generator/pkg/cmd"
+	"gopkg.in/ini.v1"
 )
 
-func main() {
-	var cli cmd.CLI
-	ctx := kong.Parse(&cli)
-
-	if cli.Debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	}
-
-	err := ctx.Run(cli)
-	if err != nil {
-		log.Panic().Err(err).Msgf("unexpected CLI error")
+func GetKeySetter(section *ini.Section) func(key, value string) {
+	return func(key, value string) {
+		_, err := section.NewKey(key, value)
+		if err != nil {
+			log.Panic().Err(err).
+				Str("section", section.Name()).Str("key", key).Str("val", value).
+				Msg("could not set")
+		}
 	}
 }
