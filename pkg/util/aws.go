@@ -57,26 +57,19 @@ func GetAWSContext() (client *AWSContext) {
 }
 
 func (ctx *AWSContext) GetRolesAndAccounts() (roleArns []string, accountMap map[string]string) {
-	accountMap = ctx.getAccountNames()
+	cRoles := make(chan []string)
+	cAccount := make(chan map[string]string)
 
-	gcio, err := ctx.sts.GetCallerIdentity(&sts.GetCallerIdentityInput{})
-	if err != nil {
-		log.Panic().Err(err).Msg("could not get caller identity")
-	}
+	go func() {
+		cRoles <- ctx.getRoles()
+	}()
 
-	log.Info().Str("user-arn", *gcio.Arn).Msg("Found user")
+	go func() {
+		cAccount <- ctx.getAccountNames()
+	}()
 
-	lgfuo, err := ctx.iam.ListGroupsForUser(&iam.ListGroupsForUserInput{
-		UserName: getUser(gcio.Arn),
-	})
-	if err != nil {
-		log.Panic().Err(err).Str("user", *getUser(gcio.Arn)).Msg("could not list groups for user")
-	}
-
-	for _, group := range lgfuo.Groups {
-		log.Debug().Str("group", *group.GroupName).Msg("Finding roles for group")
-		roleArns = append(roleArns, ctx.getRoleArnsForGroup(group)...)
-	}
+	roleArns = <-cRoles
+	accountMap = <-cAccount
 
 	return
 }
@@ -132,6 +125,44 @@ func getUser(userArn *string) *string {
 	return &arnParts[1]
 }
 
+func (ctx *AWSContext) getRoles() (roleArns []string) {
+	log.Debug().Msg("getting caller identity")
+
+	gcio, err := ctx.sts.GetCallerIdentity(&sts.GetCallerIdentityInput{})
+	if err != nil {
+		log.Panic().Err(err).Msg("could not get caller identity")
+	}
+
+	log.Info().Str("user-arn", *gcio.Arn).Msg("Found user")
+
+	lgfuo, err := ctx.iam.ListGroupsForUser(&iam.ListGroupsForUserInput{
+		UserName: getUser(gcio.Arn),
+	})
+	if err != nil {
+		log.Panic().Err(err).Str("user", *getUser(gcio.Arn)).Msg("could not list groups for user")
+	}
+
+	log.Debug().Msgf("Found %d groups", len(lgfuo.Groups))
+
+	c := make(chan []string)
+
+	for _, group := range lgfuo.Groups {
+		go func(g iam.Group) {
+			log.Debug().Str("group", *g.GroupName).Msg("Finding roles for group")
+			c <- ctx.getRoleArnsForGroup(&g)
+		}(*group)
+	}
+
+	for range lgfuo.Groups {
+		roleArns = append(roleArns, (<-c)...)
+	}
+
+	log.Info().Msgf("Found %d roles", len(roleArns))
+	log.Debug().Strs("roles", roleArns).Msgf("Roles")
+
+	return
+}
+
 func (ctx *AWSContext) getAccountNames() map[string]string {
 	accIDToName := map[string]string{}
 
@@ -145,9 +176,13 @@ func (ctx *AWSContext) getAccountNames() map[string]string {
 			break
 		}
 
+		log.Debug().Msgf("found %d member accounts", len(lao.Accounts))
+
 		for _, acc := range lao.Accounts {
 			accIDToName[*acc.Id] = *acc.Name
-			log.Debug().Str("account-id", *acc.Id).Str("account-name", *acc.Name).
+			log.Debug().
+				Str("account-id", *acc.Id).
+				Str("account-name", *acc.Name).
 				Msg("found organization member account")
 		}
 
@@ -162,16 +197,61 @@ func (ctx *AWSContext) getAccountNames() map[string]string {
 }
 
 func (ctx *AWSContext) getRoleArnsForGroup(group *iam.Group) (roles []string) {
+	c := make(chan []string)
+
+	go func() {
+		c <- ctx.listInlinePolicyAndGetRoles(group)
+	}()
+	go func() {
+		c <- ctx.listAttachedPolicyAndGetRoles(group)
+	}()
+
+	roles = append(roles, (<-c)...)
+	roles = append(roles, (<-c)...)
+
+	return
+}
+
+func (ctx *AWSContext) listInlinePolicyAndGetRoles(group *iam.Group) (roleArns []string) {
+	log.Debug().Str("group", *group.GroupName).Msg("finding roles from group inline policies")
+
 	lgpo, err := ctx.iam.ListGroupPolicies(&iam.ListGroupPoliciesInput{
 		GroupName: group.GroupName,
 	})
 	if err != nil {
 		log.Panic().Err(err).Str("group", *group.GroupName).Msg("could not list inline group policies")
 	}
+
+	c := make(chan []string)
+
 	for _, policy := range lgpo.PolicyNames {
-		log.Debug().Str("policy", *policy).Msg("Finding roles for inlined policy")
-		roles = append(roles, ctx.getRoleArnsForInlinePolicy(group.GroupName, policy)...)
+		go func(p string) {
+			log.Debug().Str("policy", p).Msg("Finding roles for inlined policy")
+			c <- ctx.getRoleArnsForInlinePolicy(*group.GroupName, p)
+		}(*policy)
 	}
+
+	for range lgpo.PolicyNames {
+		roleArns = append(roleArns, (<-c)...)
+	}
+
+	return
+}
+
+func (ctx *AWSContext) getRoleArnsForInlinePolicy(group, policyName string) []string {
+	ggpo, err := ctx.iam.GetGroupPolicy(&iam.GetGroupPolicyInput{
+		GroupName:  &group,
+		PolicyName: &policyName,
+	})
+	if err != nil {
+		log.Panic().Err(err).Msg("could not get group policy")
+	}
+
+	return getRolesArnsFromPolicy(ggpo.PolicyDocument)
+}
+
+func (ctx *AWSContext) listAttachedPolicyAndGetRoles(group *iam.Group) (roleArns []string) {
+	log.Debug().Str("group", *group.GroupName).Msg("finding roles from group attached policies")
 
 	lagpo, err := ctx.iam.ListAttachedGroupPolicies(&iam.ListAttachedGroupPoliciesInput{
 		GroupName: group.GroupName,
@@ -179,24 +259,21 @@ func (ctx *AWSContext) getRoleArnsForGroup(group *iam.Group) (roles []string) {
 	if err != nil {
 		log.Panic().Err(err).Str("group", *group.GroupName).Msg("could not list attached group policies")
 	}
+
+	c := make(chan []string)
+
 	for _, policy := range lagpo.AttachedPolicies {
-		log.Debug().Str("policy ARN", *policy.PolicyArn).Msg("Finding roles for attached policy")
-		roles = append(roles, ctx.getRoleArnsForAttachedPolicy(policy)...)
+		go func(p iam.AttachedPolicy) {
+			log.Debug().Str("policy ARN", *p.PolicyArn).Msg("Finding roles for attached policy")
+			c <- ctx.getRoleArnsForAttachedPolicy(&p)
+		}(*policy)
+	}
+
+	for range lagpo.AttachedPolicies {
+		roleArns = append(roleArns, (<-c)...)
 	}
 
 	return
-}
-
-func (ctx *AWSContext) getRoleArnsForInlinePolicy(group, policyName *string) []string {
-	ggpo, err := ctx.iam.GetGroupPolicy(&iam.GetGroupPolicyInput{
-		GroupName:  group,
-		PolicyName: policyName,
-	})
-	if err != nil {
-		log.Panic().Err(err).Msg("could not get group policy")
-	}
-
-	return getRolesArnsFromPolicy(ggpo.PolicyDocument)
 }
 
 func (ctx *AWSContext) getRoleArnsForAttachedPolicy(policy *iam.AttachedPolicy) []string {
