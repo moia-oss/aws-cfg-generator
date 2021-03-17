@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -23,32 +24,33 @@ const (
 )
 
 type AWSContext struct {
-	userArn *string
-	org     *organizations.Organizations
-	iam     *iam.IAM
+	org *organizations.Organizations
+	iam *iam.IAM
+	sts *sts.STS
 }
 
 func GetAWSContext() (client *AWSContext) {
 	sess := session.Must(session.NewSession())
-	stsClient := sts.New(sess)
 
-	gcio, err := stsClient.GetCallerIdentity(&sts.GetCallerIdentityInput{})
-	if err != nil {
-		panic(err)
-	}
+	config := aws.NewConfig()
 
 	return &AWSContext{
-		userArn: getUser(gcio.Arn),
-		org:     organizations.New(sess),
-		iam:     iam.New(sess),
+		org: organizations.New(sess, config),
+		iam: iam.New(sess, config),
+		sts: sts.New(sess, config),
 	}
 }
 
 func (ctx *AWSContext) GetRolesAndAccounts() (roleArns []string, accountMap map[string]string) {
 	accountMap = ctx.getAccountNames()
 
+	gcio, err := ctx.sts.GetCallerIdentity(&sts.GetCallerIdentityInput{})
+	if err != nil {
+		panic(err)
+	}
+
 	lgfuo, err := ctx.iam.ListGroupsForUser(&iam.ListGroupsForUserInput{
-		UserName: ctx.userArn,
+		UserName: getUser(gcio.Arn),
 	})
 	if err != nil {
 		panic(err)

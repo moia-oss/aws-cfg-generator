@@ -17,6 +17,11 @@ lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 format:
 	gofmt -s -w ./aws-cfg-generator/
 
+# Run all tests
+.PHONY: test
+test:
+	cd aws-cfg-generator; go test
+
 .PHONY: create-golint-config
 create-golint-config: .golangci.yml
 
