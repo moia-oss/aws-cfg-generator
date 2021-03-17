@@ -5,6 +5,20 @@ aws-cfg-generator is a CLI tool to generate configs for AWS helper tools based o
 To use this tool you need AWS credentials for an IAM user. This IAM user also needs sufficient permissions to read their
 own permission sets and group memberships.
 
+```
+Usage: aws-cfg-generator <command>
+
+Flags:
+  -h, --help    Show context-sensitive help.
+
+Commands:
+  vault --vault-config-path=STRING
+    generates a config for aws-vault
+
+  switch-roles --output-file=STRING
+    generates a config for aws-extend-switch-roles
+```
+
 ## Profile names
 
 In order to name profiles correctly, aws-cfg-generator will attempt to call `organizations.ListAccounts` and match that
@@ -63,12 +77,17 @@ include_profile=default
 #### Flags
 
 ```
---source-profile="default"    The profile that your credentials should come from
---region=STRING               Override the region configured with your source profile
---vault-config-path=STRING    Where to load/save the config
---keep-custom-config          Retains any custom profiles or settings. Set to false to remove everything
-                              except the source profile and generated config
---use-role-name-in-profile    Append the role name to the profile name
+REQUIRED
+
+--vault-config-path=STRING         Where to load/save the config
+
+OPTIONAL
+
+--source-profile="default"         The profile that your credentials should come from
+--region=STRING                    Override the region configured with your source profile
+--keep-custom-config=true          Retains any custom profiles or settings. Set to false to remove everything
+                                   except the source profile and generated config
+--use-role-name-in-profile=false   Append the role name to the profile name
 ```
 
 ### aws-extend-switch-roles
@@ -94,9 +113,14 @@ color = 00ff7f
 #### Flags
 
 ```
---color="00ff7f"              The hexcode color that should be set for each profile
---output-file=STRING          Where to save the config.
---use-role-name-in-profile    Append the role name to the profile name
+REQUIRED
+
+--output-file=STRING                Where to save the config.
+
+OPTIONAL
+
+--color="00ff7f"                    The hexcode color that should be set for each profile
+--use-role-name-in-profile=false    Append the role name to the profile name
 ```
 
 ## Known-limitations
