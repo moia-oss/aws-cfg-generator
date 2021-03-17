@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/gen"
+	"github.com/moia-oss/aws-cfg-generator/pkg/cmd"
+	"github.com/moia-oss/aws-cfg-generator/pkg/gen"
 )
 
 func setup(configFileContents string) (filename string) {

@@ -20,9 +20,9 @@ import (
 
 	"github.com/alecthomas/kong"
 
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/gen"
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/util"
+	"github.com/moia-oss/aws-cfg-generator/pkg/cmd"
+	"github.com/moia-oss/aws-cfg-generator/pkg/gen"
+	"github.com/moia-oss/aws-cfg-generator/pkg/util"
 )
 
 // nolint:govet // we need the bare `cmd` tag here

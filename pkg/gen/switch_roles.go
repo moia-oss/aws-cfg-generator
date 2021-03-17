@@ -1,8 +1,8 @@
 package gen
 
 import (
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/util"
+	"github.com/moia-oss/aws-cfg-generator/pkg/cmd"
+	"github.com/moia-oss/aws-cfg-generator/pkg/util"
 	"github.com/rs/zerolog/log"
 
 	"gopkg.in/ini.v1"
