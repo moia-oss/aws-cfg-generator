@@ -233,9 +233,9 @@ color          = ffffff
 `,
 			run: func(filename string) {
 				gen.GenerateSwitchRolesProfile(accountMap, roleArns, cmd.SwitchRolesCmd{
-					OutputFile:      filename,
+					OutputFile:           filename,
 					UseRoleNameInProfile: false,
-					Color: "ffffff",
+					Color:                "ffffff",
 				})
 			},
 		},
@@ -249,9 +249,9 @@ color          = ffffff
 `,
 			run: func(filename string) {
 				gen.GenerateSwitchRolesProfile(accountMap, roleArns, cmd.SwitchRolesCmd{
-					OutputFile:      filename,
+					OutputFile:           filename,
 					UseRoleNameInProfile: true,
-					Color: "ffffff",
+					Color:                "ffffff",
 				})
 			},
 		},
@@ -265,9 +265,9 @@ color          = ffffff
 `,
 			run: func(filename string) {
 				gen.GenerateSwitchRolesProfile(accountMap, []string{"arn:aws:iam::67890:role/my-role"}, cmd.SwitchRolesCmd{
-					OutputFile:      filename,
+					OutputFile:           filename,
 					UseRoleNameInProfile: false,
-					Color: "ffffff",
+					Color:                "ffffff",
 				})
 			},
 		},

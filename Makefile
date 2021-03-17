@@ -17,6 +17,11 @@ lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 format:
 	gofmt -s -w ./aws-cfg-generator/
 
+# Check formatting
+.PHONY: format-check
+format-check:
+	if [ "$$(gofmt -s -l ./aws-cfg-generator/ | wc -l)" -gt 0 ]; then exit 1; fi;
+
 # Run all tests
 .PHONY: test
 test:

@@ -8,7 +8,6 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-
 func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOptions cmd.VaultCmd) {
 	config, err := ini.Load(cmdOptions.VaultConfigPath)
 
@@ -32,7 +31,7 @@ func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOp
 	// only copy the source profile and generated profiles, discard the rest of the config
 	if !cmdOptions.KeepCustomConfig {
 		newConfig := ini.Empty()
-		
+
 		setProfileKey := util.GetKeySetter(newConfig.Section(sourceProfileSectionName))
 
 		for key, value := range config.Section(sourceProfileSectionName).KeysHash() {
@@ -62,4 +61,3 @@ func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOp
 		panic(err)
 	}
 }
-
