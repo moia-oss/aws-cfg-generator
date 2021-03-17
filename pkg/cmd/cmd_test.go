@@ -1,4 +1,17 @@
-package main
+package cmd
+
+/*
+   Copyright 2021 MOIA GmbH
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 
 import (
 	"fmt"
@@ -7,9 +20,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
-	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/gen"
 )
 
 func setup(configFileContents string) (filename string) {
@@ -51,7 +61,7 @@ source_profile  = default
 include_profile = default
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, roleArns, cmd.VaultCmd{
+				generateVaultProfile(accountMap, roleArns, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        `default`,
 					KeepCustomConfig:     false,
@@ -72,7 +82,7 @@ source_profile  = default
 include_profile = default
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, []string{"foobar", "arn:aws:iam::12345:role/my-role"}, cmd.VaultCmd{
+				generateVaultProfile(accountMap, []string{"foobar", "arn:aws:iam::12345:role/my-role"}, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        `default`,
 					KeepCustomConfig:     false,
@@ -93,7 +103,7 @@ source_profile  = default
 include_profile = default
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, []string{"arn:aws:iam::67890:role/my-role"}, cmd.VaultCmd{
+				generateVaultProfile(accountMap, []string{"arn:aws:iam::67890:role/my-role"}, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        `default`,
 					KeepCustomConfig:     false,
@@ -114,7 +124,7 @@ source_profile  = my-profile
 include_profile = my-profile
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, roleArns, cmd.VaultCmd{
+				generateVaultProfile(accountMap, roleArns, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        "my-profile",
 					KeepCustomConfig:     false,
@@ -135,7 +145,7 @@ source_profile  = default
 include_profile = default
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, roleArns, cmd.VaultCmd{
+				generateVaultProfile(accountMap, roleArns, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        `default`,
 					KeepCustomConfig:     false,
@@ -170,7 +180,7 @@ include_profile = default
 [profile some-other-profile]
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, roleArns, cmd.VaultCmd{
+				generateVaultProfile(accountMap, roleArns, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        `default`,
 					KeepCustomConfig:     true,
@@ -202,7 +212,7 @@ source_profile  = default
 include_profile = default
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, roleArns, cmd.VaultCmd{
+				generateVaultProfile(accountMap, roleArns, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        `default`,
 					KeepCustomConfig:     false,
@@ -224,7 +234,7 @@ include_profile = default
 region          = eu-central-1
 `,
 			run: func(filename string) {
-				gen.GenerateVaultProfile(accountMap, roleArns, cmd.VaultCmd{
+				generateVaultProfile(accountMap, roleArns, VaultCmd{
 					VaultConfigPath:      filename,
 					SourceProfile:        `default`,
 					KeepCustomConfig:     false,
@@ -243,7 +253,7 @@ role_name      = my-role
 color          = ffffff
 `,
 			run: func(filename string) {
-				gen.GenerateSwitchRolesProfile(accountMap, roleArns, cmd.SwitchRolesCmd{
+				generateSwitchRolesProfile(accountMap, roleArns, SwitchRolesCmd{
 					OutputFile:           filename,
 					UseRoleNameInProfile: false,
 					Color:                "ffffff",
@@ -260,7 +270,7 @@ role_name      = my-role
 color          = ffffff
 `,
 			run: func(filename string) {
-				gen.GenerateSwitchRolesProfile(accountMap, roleArns, cmd.SwitchRolesCmd{
+				generateSwitchRolesProfile(accountMap, roleArns, SwitchRolesCmd{
 					OutputFile:           filename,
 					UseRoleNameInProfile: true,
 					Color:                "ffffff",
@@ -277,7 +287,7 @@ role_name      = my-role
 color          = ffffff
 `,
 			run: func(filename string) {
-				gen.GenerateSwitchRolesProfile(accountMap, []string{"arn:aws:iam::67890:role/my-role"}, cmd.SwitchRolesCmd{
+				generateSwitchRolesProfile(accountMap, []string{"arn:aws:iam::67890:role/my-role"}, SwitchRolesCmd{
 					OutputFile:           filename,
 					UseRoleNameInProfile: false,
 					Color:                "ffffff",

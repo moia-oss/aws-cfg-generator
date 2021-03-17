@@ -25,7 +25,7 @@ format-check:
 # Run all tests
 .PHONY: test
 test:
-	cd aws-cfg-generator; go test -test.v
+	go test -test.v ./...
 
 .PHONY: create-golint-config
 create-golint-config: .golangci.yml
