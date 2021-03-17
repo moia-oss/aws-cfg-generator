@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -26,20 +27,22 @@ func setup(configFileContents string) (filename string) {
 }
 
 type TestCase struct {
+	describe       string
 	it             string
 	originalConfig string
 	expectedConfig string
 	run            func(filename string)
 }
 
-func TestVault(t *testing.T) {
+func TestAll(t *testing.T) {
 	roleArns := []string{"arn:aws:iam::12345:role/my-role"}
 	accountMap := map[string]string{"12345": "my-account"}
 
 	testCases := []TestCase{
 		{
+			describe:       "vault",
 			it:             "generates a basic profile",
-			originalConfig: "[default]",
+			originalConfig: `[default]`,
 			expectedConfig: `[default]
 
 [profile my-account]
@@ -58,8 +61,9 @@ include_profile = default
 			},
 		},
 		{
+			describe:       "vault",
 			it:             "skips invalid roles",
-			originalConfig: "[default]",
+			originalConfig: `[default]`,
 			expectedConfig: `[default]
 
 [profile my-account]
@@ -78,8 +82,9 @@ include_profile = default
 			},
 		},
 		{
+			describe:       "vault",
 			it:             "falls back to account numbers",
-			originalConfig: "[default]",
+			originalConfig: `[default]`,
 			expectedConfig: `[default]
 
 [profile 67890]
@@ -98,6 +103,7 @@ include_profile = default
 			},
 		},
 		{
+			describe:       "vault",
 			it:             "accepts a custom source profile",
 			originalConfig: "[profile my-profile]",
 			expectedConfig: `[profile my-profile]
@@ -118,8 +124,9 @@ include_profile = my-profile
 			},
 		},
 		{
+			describe:       "vault",
 			it:             "allows generation of profiles with role names",
-			originalConfig: "[default]",
+			originalConfig: `[default]`,
 			expectedConfig: `[default]
 
 [profile my-account_my-role]
@@ -138,7 +145,8 @@ include_profile = default
 			},
 		},
 		{
-			it: "keeps custom config options if set to true",
+			describe: "vault",
+			it:       "keeps custom config options if set to true",
 			originalConfig: `[default]
 output = json
 
@@ -172,7 +180,8 @@ include_profile = default
 			},
 		},
 		{
-			it: "deletes custom config options (but retains the source profile) if set to false",
+			describe: "vault",
+			it:       "deletes custom config options (but retains the source profile) if set to false",
 			originalConfig: `[default]
 output = json
 
@@ -203,6 +212,7 @@ include_profile = default
 			},
 		},
 		{
+			describe:       "vault",
 			it:             "sets the region if supplied",
 			originalConfig: `[default]`,
 			expectedConfig: `[default]
@@ -224,8 +234,9 @@ region          = eu-central-1
 			},
 		},
 		{
-			it:             "generates a basic switch roles profile with colors",
-			originalConfig: "",
+			describe:       "switch-roles",
+			it:             "generates a basic profile with colors",
+			originalConfig: ``,
 			expectedConfig: `[my-account]
 aws_account_id = 12345
 role_name      = my-role
@@ -240,8 +251,9 @@ color          = ffffff
 			},
 		},
 		{
+			describe:       "switch-roles",
 			it:             "uses role names",
-			originalConfig: "",
+			originalConfig: ``,
 			expectedConfig: `[my-account_my-role]
 aws_account_id = 12345
 role_name      = my-role
@@ -256,8 +268,9 @@ color          = ffffff
 			},
 		},
 		{
+			describe:       "switch-roles",
 			it:             "falls back to account numbers",
-			originalConfig: "",
+			originalConfig: ``,
 			expectedConfig: `[67890]
 aws_account_id = 67890
 role_name      = my-role
@@ -274,24 +287,24 @@ color          = ffffff
 	}
 
 	for _, testCase := range testCases {
-		filename := setup(testCase.originalConfig)
-		defer os.Remove(filename)
+		t.Run(fmt.Sprintf("%s %s", testCase.describe, testCase.it), func(t *testing.T) {
 
-		testCase.run(filename)
+			filename := setup(testCase.originalConfig)
+			defer os.Remove(filename)
 
-		actualConfig := getFile(filename)
+			testCase.run(filename)
 
-		if testCase.expectedConfig != actualConfig {
-			t.Errorf(`
-Test Case [%s] failed.
+			actualConfig := getFile(filename)
 
-Expected
+			if testCase.expectedConfig != actualConfig {
+				t.Errorf(`Expected
 --------
 %s
 Got
 --------
-%s`, testCase.it, testCase.expectedConfig, actualConfig)
-		}
+%s`, testCase.expectedConfig, actualConfig)
+			}
+		})
 	}
 }
 
