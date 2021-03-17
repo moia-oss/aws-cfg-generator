@@ -14,6 +14,7 @@ package main
 */
 
 import (
+	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -28,6 +29,8 @@ func main() {
 
 	var cli cmd.CLI
 	ctx := kong.Parse(&cli)
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	if cli.Debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
