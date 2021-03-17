@@ -14,6 +14,8 @@ package main
 */
 
 import (
+	"time"
+
 	"github.com/alecthomas/kong"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -22,6 +24,8 @@ import (
 )
 
 func main() {
+	start := time.Now()
+
 	var cli cmd.CLI
 	ctx := kong.Parse(&cli)
 
@@ -30,9 +34,11 @@ func main() {
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
-
 	err := ctx.Run(cli)
 	if err != nil {
 		log.Panic().Err(err).Msgf("unexpected CLI error")
 	}
+
+	elapsed := time.Since(start)
+	log.Info().Msgf("Done in %s", elapsed)
 }
