@@ -44,6 +44,7 @@ type VaultCmd struct {
 	SourceProfile        string `help:"The profile that your credentials should come from" default:"default"`
 	Region               string `help:"Override the region configured with your source profile"`
 	VaultConfigPath      string `help:"Where to load/save the config" required`
+	KeepCustomConfig     bool   `help:"Retains any custom profiles or settings. Set to false to remove everything except the source profile and generated config" default:true`
 	UseRoleNameInProfile bool   `help:"Append the role name to the profile name" default:false`
 }
 
@@ -66,6 +67,15 @@ type PolicyDoc struct {
 func getUser(userArn *string) *string {
 	arnParts := strings.Split(*userArn, "/")
 	return &arnParts[1]
+}
+
+func getKeySetter(section *ini.Section) func(key, value string) {
+	return func(key, value string) {
+		_, err := section.NewKey(key, value)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func getProfileAndRoleName(accountMap map[string]string, role arn.ARN, useRoleName bool) (profileName string, roleName string) {
@@ -98,16 +108,11 @@ func generateSwitchRolesProfile(accountMap map[string]string, roleArns []string,
 
 		profileSection := config.Section(profileName)
 
-		newKey := func(key string, value string) {
-			_, err := profileSection.NewKey(key, value)
-			if err != nil {
-				panic(err)
-			}
-		}
+		setKey := getKeySetter(profileSection)
 
-		newKey("aws_account_id", role.AccountID)
-		newKey("role_name", roleName)
-		newKey("color", cmd.Color)
+		setKey("aws_account_id", role.AccountID)
+		setKey("role_name", roleName)
+		setKey("color", cmd.Color)
 	}
 
 	err := config.SaveTo(cmd.OutputFile)
@@ -124,6 +129,37 @@ func generateVaultProfile(accountMap map[string]string, roleArns []string, cmd V
 		panic(err)
 	}
 
+	sourceProfileSectionName := cmd.SourceProfile
+
+	// the profile can either be [default] or [profile foo]
+	if sourceProfileSectionName != "default" {
+		sourceProfileSectionName = fmt.Sprint("profile ", sourceProfileSectionName)
+	}
+
+	// make sure the source section exists
+	sourceProfileSection, err := config.GetSection(sourceProfileSectionName)
+
+	if err != nil {
+		panic(err)
+	}
+
+	// only copy the source profile, discard the rest of the config
+	if !cmd.KeepCustomConfig {
+		config = ini.Empty()
+
+		newSourceProfileSection, err := config.NewSection(sourceProfileSectionName)
+
+		if err != nil {
+			panic(err)
+		}
+
+		setKey := getKeySetter(newSourceProfileSection)
+
+		for key, value := range sourceProfileSection.KeysHash() {
+			setKey(key, value)
+		}
+	}
+
 	for _, roleArn := range roleArns {
 		// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
 		if !arn.IsARN(roleArn) {
@@ -138,19 +174,14 @@ func generateVaultProfile(accountMap map[string]string, roleArns []string, cmd V
 
 		profileSection := config.Section(sectionName)
 
-		newKey := func(key string, value string) {
-			_, err := profileSection.NewKey(key, value)
-			if err != nil {
-				panic(err)
-			}
-		}
+		setKey := getKeySetter(profileSection)
 
-		newKey("role_arn", roleArn)
-		newKey("source_profile", cmd.SourceProfile)
-		newKey("include_profile", cmd.SourceProfile)
+		setKey("role_arn", roleArn)
+		setKey("source_profile", cmd.SourceProfile)
+		setKey("include_profile", cmd.SourceProfile)
 
 		if cmd.Region != "" {
-			newKey("region", cmd.Region)
+			setKey("region", cmd.Region)
 		}
 	}
 

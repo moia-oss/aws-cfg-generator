@@ -66,6 +66,8 @@ include_profile=default
 --source-profile="default"    The profile that your credentials should come from
 --region=STRING               Override the region configured with your source profile
 --vault-config-path=STRING    Where to load/save the config
+--keep-custom-config          Retains any custom profiles or settings. Set to false to remove everything
+                              except the source profile and generated config
 --use-role-name-in-profile    Append the role name to the profile name
 ```
 
