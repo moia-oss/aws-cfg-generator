@@ -5,14 +5,15 @@ import (
 
 	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
 	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/util"
+
+	"github.com/rs/zerolog/log"
 	"gopkg.in/ini.v1"
 )
 
 func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOptions cmd.VaultCmd) {
 	config, err := ini.Load(cmdOptions.VaultConfigPath)
-
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("file-path", cmdOptions.VaultConfigPath).Msg("could not load config")
 	}
 
 	sourceProfileSectionName := cmdOptions.SourceProfile
@@ -56,8 +57,7 @@ func GenerateVaultProfile(accountMap map[string]string, roleArns []string, cmdOp
 	}
 
 	err = config.SaveTo(cmdOptions.VaultConfigPath)
-
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("file-path", cmdOptions.VaultConfigPath).Msg("could not save config")
 	}
 }
