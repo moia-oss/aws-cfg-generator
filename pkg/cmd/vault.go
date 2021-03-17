@@ -53,7 +53,7 @@ func generateVaultProfile(accountMap map[string]string, roleArns []string, cmdOp
 	// make sure the source section exists
 	_, err = config.GetSection(sourceProfileSectionName)
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("section", sourceProfileSectionName).Msg("source profile not found")
 	}
 
 	// only copy the source profile and generated profiles, discard the rest of the config
