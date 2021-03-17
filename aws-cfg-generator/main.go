@@ -33,6 +33,6 @@ func main() {
 
 	err := ctx.Run(cli)
 	if err != nil {
-		log.Panic().Err(err).Msgf("unsupported command '%s'", ctx.Command())
+		log.Panic().Err(err).Msgf("unexpected CLI error")
 	}
 }
