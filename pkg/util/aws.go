@@ -61,7 +61,7 @@ func (ctx *AWSContext) GetRolesAndAccounts() (roleArns []string, accountMap map[
 
 	gcio, err := ctx.sts.GetCallerIdentity(&sts.GetCallerIdentityInput{})
 	if err != nil {
-		log.Panic().Err(err).Msg("coulld not get caller identity")
+		log.Panic().Err(err).Msg("could not get caller identity")
 	}
 
 	log.Info().Str("user-arn", *gcio.Arn).Msg("Found user")
