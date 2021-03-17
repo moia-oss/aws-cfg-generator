@@ -14,26 +14,15 @@ package main
 */
 
 import (
-	"fmt"
-
-	"github.com/rs/zerolog"
-
 	"github.com/alecthomas/kong"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/moia-oss/aws-cfg-generator/pkg/cmd"
-	"github.com/moia-oss/aws-cfg-generator/pkg/gen"
-	"github.com/moia-oss/aws-cfg-generator/pkg/util"
 )
 
-// nolint:govet // we need the bare `cmd` tag here
-type CLI struct {
-	Vault       cmd.VaultCmd       `cmd help:"generates a config for aws-vault"`
-	SwitchRoles cmd.SwitchRolesCmd `cmd help:"generates a config for aws-extend-switch-roles"`
-	Debug       bool               `help:"set the log level to debug" default:false`
-}
-
 func main() {
-	var cli CLI
+	var cli cmd.CLI
 	ctx := kong.Parse(&cli)
 
 	if cli.Debug {
@@ -42,15 +31,8 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 
-	switch ctx.Command() {
-	case "vault":
-		roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts()
-		gen.GenerateVaultProfile(accountMap, roleArns, cli.Vault)
-
-	case "switch-roles":
-		roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts()
-		gen.GenerateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles)
-	default:
-		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
+	err := ctx.Run(cli)
+	if err != nil {
+		log.Panic().Err(err).Msgf("unsupported command '%s'", ctx.Command())
 	}
 }
