@@ -1,31 +1,23 @@
-name: "release"
-
+name: release
 on:
   push:
     tags:
       - "v*"
-
 jobs:
   tagged-release:
-    name: "Tagged Release"
-    runs-on: "ubuntu-latest"
-
+    name: Tagged Release
+    runs-on: ubuntu-latest
     steps:
-      - name: "checkout"
-        uses: "actions/checkout@v2"
-
+      - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: '^1.16'
-
-      - name: lint and build
-        run: |
-          make lint
-          make build
-
-      - uses: "marvinpinto/action-automatic-releases@latest"
+          go-version: ^1.16
+      - run: make lint
+      - run: make build
+      - run: make test
+      - uses: marvinpinto/action-automatic-releases@latest
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false
           automatic_release_tag: ${{ env.GITHUB_REF }}
           files: |

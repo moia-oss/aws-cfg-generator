@@ -14,308 +14,34 @@ package main
 */
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/url"
-	"strings"
-	"text/template"
 
 	"github.com/alecthomas/kong"
-	"github.com/aws/aws-sdk-go/aws/arn"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/organizations"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/cmd"
+	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/gen"
+	"github.com/moia-oss/aws-cfg-generator/aws-cfg-generator/util"
 )
-
-const (
-	assumeAction = "sts:AssumeRole"
-)
-
-type VaultModel struct {
-	ProfileName   string
-	Region        string
-	SourceProfile string
-	RoleArn       string
-}
-
-const vaultTemplate = `[profile {{.ProfileName}}]
-{{if (ne .Region "") }}region={{.Region}}
-{{end}}role_arn={{.RoleArn}}
-source_profile={{.SourceProfile}}
-include_profile={{.SourceProfile}}
-
-`
-
-var switchRolesTemplate = `[%s]
-aws_account_id = %s
-role_name = %s
-color = %s
-
-`
 
 // nolint:govet // we need the bare `cmd` tag here
 type CLI struct {
-	Vault       VaultCmd       `cmd help:"generates a config for aws-vault"`
-	SwitchRoles SwitchRolesCmd `cmd help:"generates a config for aws-extend-switch-roles"`
-}
-
-type VaultCmd struct {
-	SourceProfile string `help:"The profile that your credentials should come from" default:"default"`
-	Region        string `help:"Override the region configured with your source profile"`
-}
-
-type SwitchRolesCmd struct {
-	Color string `help:"The hexcode color that should be set for each profile" default:"00ff7f"`
-}
-
-type configCreator struct {
-	iamClient       *iam.IAM
-	accountMap      map[string]string
-	generateProfile func(accountMap map[string]string, role string)
-}
-
-type PolicyDoc struct {
-	Version   string
-	Statement []map[string]interface{}
-}
-
-func getUser(userArn *string) *string {
-	arnParts := strings.Split(*userArn, "/")
-	return &arnParts[1]
-}
-
-func generateSwitchRolesProfile(accountMap map[string]string, role, color string) {
-	if !arn.IsARN(role) {
-		return
-	}
-
-	roleArn, _ := arn.Parse(role)
-
-	var profileName string
-	if name, ok := accountMap[roleArn.AccountID]; ok {
-		profileName = name
-	} else {
-		profileName = roleArn.AccountID
-	}
-
-	roleSplit := strings.Split(roleArn.Resource, "/")
-
-	fmt.Printf(switchRolesTemplate, profileName, roleArn.AccountID, roleSplit[1], color)
-}
-
-func generateVaultProfile(accountMap map[string]string, role, region, sourceProfile string) {
-	// skip creating this profile if the role isn't a valid ARN (e.g. `*`)
-	if !arn.IsARN(role) {
-		return
-	}
-
-	roleArn, _ := arn.Parse(role)
-
-	t := template.Must(template.New("vaultText").Parse(vaultTemplate))
-
-	var profileName string
-	if name, ok := accountMap[roleArn.AccountID]; ok {
-		profileName = name
-	} else {
-		profileName = roleArn.AccountID
-	}
-
-	var b bytes.Buffer
-	err := t.Execute(&b, VaultModel{
-		ProfileName:   profileName,
-		Region:        region,
-		SourceProfile: sourceProfile,
-		RoleArn:       role,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Print(b.String())
-}
-
-func checkAction(action interface{}) bool {
-	if actionStr, ok := action.(string); ok && actionStr == assumeAction {
-		return true
-	}
-
-	if actionArr, ok := action.([]interface{}); ok {
-		for _, a := range actionArr {
-			if aStr, ok := a.(string); ok && aStr == assumeAction {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func getPolicyDocument(policyJSON *string) PolicyDoc {
-	policyJson, err := url.QueryUnescape(*policyJSON)
-	if err != nil {
-		panic(err)
-	}
-
-	var policyDoc PolicyDoc
-	err = json.Unmarshal([]byte(policyJson), &policyDoc)
-	if err != nil {
-		panic(err)
-	}
-
-	return policyDoc
-}
-
-func (cc *configCreator) statementHelper(polDoc PolicyDoc) {
-	for _, statement := range polDoc.Statement {
-		if effStr, ok := statement["Effect"].(string); (ok && effStr != "Allow") || !checkAction(statement["Action"]) {
-			continue
-		}
-
-		if resStr, ok := statement["Resource"].(string); ok {
-			cc.generateProfile(cc.accountMap, resStr)
-			continue
-		}
-
-		if resArr, ok := statement["Resource"].([]interface{}); ok {
-			for _, res := range resArr {
-				if resStr, ok := res.(string); ok {
-					cc.generateProfile(cc.accountMap, resStr)
-				}
-			}
-		}
-	}
-}
-
-func (cc *configCreator) generateCfgForInlinePolicy(group, policyName *string) {
-	ggpo, err := cc.iamClient.GetGroupPolicy(&iam.GetGroupPolicyInput{
-		GroupName:  group,
-		PolicyName: policyName,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	policyDoc := getPolicyDocument(ggpo.PolicyDocument)
-	cc.statementHelper(policyDoc)
-}
-
-func (cc *configCreator) generateCfgsForAttachedPolicy(policy *iam.AttachedPolicy) {
-	gpio, err := cc.iamClient.GetPolicy(&iam.GetPolicyInput{
-		PolicyArn: policy.PolicyArn,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	gpvio, err := cc.iamClient.GetPolicyVersion(&iam.GetPolicyVersionInput{
-		PolicyArn: policy.PolicyArn,
-		VersionId: gpio.Policy.DefaultVersionId,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	policyDoc := getPolicyDocument(gpvio.PolicyVersion.Document)
-	cc.statementHelper(policyDoc)
-}
-
-func (cc *configCreator) generateCfgsForGroup(group *iam.Group) {
-	lgpo, err := cc.iamClient.ListGroupPolicies(&iam.ListGroupPoliciesInput{
-		GroupName: group.GroupName,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	for _, policy := range lgpo.PolicyNames {
-		cc.generateCfgForInlinePolicy(group.GroupName, policy)
-	}
-
-	lagpo, err := cc.iamClient.ListAttachedGroupPolicies(&iam.ListAttachedGroupPoliciesInput{
-		GroupName: group.GroupName,
-	})
-	if err != nil {
-		panic(err)
-	}
-	for _, policy := range lagpo.AttachedPolicies {
-		cc.generateCfgsForAttachedPolicy(policy)
-	}
-}
-
-func getAccountNames(orgClient *organizations.Organizations) map[string]string {
-	accIDToName := map[string]string{}
-
-	lai := &organizations.ListAccountsInput{}
-
-	for {
-		lao, err := orgClient.ListAccounts(lai)
-		if err != nil {
-			// ignore error so script can be used without these permissions
-			break
-		}
-
-		for _, acc := range lao.Accounts {
-			accIDToName[*acc.Id] = *acc.Name
-		}
-
-		if lao.NextToken == nil {
-			break
-		}
-
-		lai.NextToken = lao.NextToken
-	}
-
-	return accIDToName
+	Vault       cmd.VaultCmd       `cmd help:"generates a config for aws-vault"`
+	SwitchRoles cmd.SwitchRolesCmd `cmd help:"generates a config for aws-extend-switch-roles"`
 }
 
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
 
-	var generatorFunc func(accountMap map[string]string, role string)
-
 	switch ctx.Command() {
 	case "vault":
-		generatorFunc = func(accountMap map[string]string, role string) {
-			generateVaultProfile(accountMap, role, cli.Vault.Region, cli.Vault.SourceProfile)
-		}
+		roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts()
+		gen.GenerateVaultProfile(accountMap, roleArns, cli.Vault)
+
 	case "switch-roles":
-		generatorFunc = func(accountMap map[string]string, role string) {
-			generateSwitchRolesProfile(accountMap, role, cli.SwitchRoles.Color)
-		}
+		roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts()
+		gen.GenerateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles)
+
 	default:
 		panic(fmt.Errorf("unsupported command '%s'", ctx.Command()))
-	}
-
-	sess := session.Must(session.NewSession())
-	stsClient := sts.New(sess)
-
-	gcio, err := stsClient.GetCallerIdentity(&sts.GetCallerIdentityInput{})
-	if err != nil {
-		panic(err)
-	}
-
-	user := getUser(gcio.Arn)
-
-	iamClient := iam.New(sess)
-	accMap := getAccountNames(organizations.New(sess))
-
-	cfgCreator := &configCreator{
-		iamClient:       iamClient,
-		accountMap:      accMap,
-		generateProfile: generatorFunc,
-	}
-
-	lgfuo, err := iamClient.ListGroupsForUser(&iam.ListGroupsForUserInput{
-		UserName: user,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	for _, group := range lgfuo.Groups {
-		cfgCreator.generateCfgsForGroup(group)
 	}
 }

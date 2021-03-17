@@ -12,6 +12,21 @@ GOLANGCI_LINT_VERSION := 1.38.0
 lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 	$(GO_PREFIX) ./bin/golangci-lint-$(GOLANGCI_LINT_VERSION) run $(LINT_TARGETS)
 
+# Format all code
+.PHONY: format
+format:
+	gofmt -s -w ./aws-cfg-generator/
+
+# Check formatting
+.PHONY: format-check
+format-check:
+	if [ "$$(gofmt -s -l ./aws-cfg-generator/ | wc -l)" -gt 0 ]; then exit 1; fi;
+
+# Run all tests
+.PHONY: test
+test:
+	cd aws-cfg-generator; go test -test.v
+
 .PHONY: create-golint-config
 create-golint-config: .golangci.yml
 
