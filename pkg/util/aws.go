@@ -166,7 +166,7 @@ func (ctx *AWSContext) getRoleArnsForGroup(group *iam.Group) (roles []string) {
 		GroupName: group.GroupName,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("group", *group.GroupName).Msg("could not list inline group policies")
 	}
 	for _, policy := range lgpo.PolicyNames {
 		log.Debug().Str("policy", *policy).Msg("Finding roles for inlined policy")
@@ -177,7 +177,7 @@ func (ctx *AWSContext) getRoleArnsForGroup(group *iam.Group) (roles []string) {
 		GroupName: group.GroupName,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("group", *group.GroupName).Msg("could not list attached group policies")
 	}
 	for _, policy := range lagpo.AttachedPolicies {
 		log.Debug().Str("policy ARN", *policy.PolicyArn).Msg("Finding roles for attached policy")
@@ -204,7 +204,7 @@ func (ctx *AWSContext) getRoleArnsForAttachedPolicy(policy *iam.AttachedPolicy) 
 		PolicyArn: policy.PolicyArn,
 	})
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err).Str("policy-arn", *policy.PolicyArn).Msg("could not get policy")
 	}
 
 	gpvio, err := ctx.iam.GetPolicyVersion(&iam.GetPolicyVersionInput{
