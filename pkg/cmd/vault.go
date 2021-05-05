@@ -31,7 +31,7 @@ type VaultCmd struct {
 }
 
 func (vc *VaultCmd) Run(cli *CLI) error {
-	roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts()
+	roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts(cli.Role)
 	generateVaultProfile(accountMap, roleArns, cli.Vault)
 
 	return nil
