@@ -27,7 +27,7 @@ type SwitchRolesCmd struct {
 }
 
 func (swc *SwitchRolesCmd) Run(cli *CLI) error {
-	roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts()
+	roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts(cli.Role)
 	generateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles)
 
 	return nil

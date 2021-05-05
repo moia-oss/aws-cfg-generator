@@ -56,7 +56,17 @@ func GetAWSContext() (client *AWSContext) {
 	}
 }
 
-func (ctx *AWSContext) GetRolesAndAccounts() (roleArns []string, accountMap map[string]string) {
+func generateOrgRoleArns(accountMap map[string]string, role string) []string {
+	var roles []string
+
+	for accountId := range accountMap {
+		roles = append(roles, fmt.Sprintf("arn:aws:iam::%s:role/%s", accountId, role))
+	}
+
+	return roles
+}
+
+func (ctx *AWSContext) GetRolesAndAccounts(role string) (roleArns []string, accountMap map[string]string) {
 	cRoles := make(chan []string)
 	cAccount := make(chan map[string]string)
 
@@ -68,8 +78,15 @@ func (ctx *AWSContext) GetRolesAndAccounts() (roleArns []string, accountMap map[
 		cAccount <- ctx.getAccountNames()
 	}()
 
-	roleArns = <-cRoles
 	accountMap = <-cAccount
+	close(cAccount)
+
+	if role != "" {
+		roleArns = generateOrgRoleArns(accountMap, role)
+	}
+
+	roleArns = append(roleArns, <-cRoles...)
+	close(cRoles)
 
 	return
 }

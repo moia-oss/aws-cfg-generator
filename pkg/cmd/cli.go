@@ -17,5 +17,6 @@ package cmd
 type CLI struct {
 	Vault       VaultCmd       `cmd help:"generates a config for aws-vault"`
 	SwitchRoles SwitchRolesCmd `cmd help:"generates a config for aws-extend-switch-roles"`
-	Debug       bool           `help:"set the log level to debug" default:false`
+	Debug       bool           `help:"set the log level to debug" default:"false"`
+	Role        string         `help:"If set, then a profile with this role will be generated for every account in the organization, in addition to the roles that the user has permissions to assume"`
 }
