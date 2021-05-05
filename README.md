@@ -88,7 +88,12 @@ OPTIONAL
 --keep-custom-config=true          Retains any custom profiles or settings. Set to false to remove everything
                                    except the source profile and generated config
 --use-role-name-in-profile=false   Append the role name to the profile name
+--role=STRING                      If set, then a profile with this role will be generated for every account in the organization, in addition to the roles that the user has permissions to assume
 ```
+
+Note: When using the `--role` flag we do not check to see if the user has permission to assume that role. This is useful
+if the user has a policy that allows them e.g. `sts:AssumeRole` on resource `*` and the target accounts
+manage who is allowed to assume various roles.
 
 ### aws-extend-switch-roles
 
