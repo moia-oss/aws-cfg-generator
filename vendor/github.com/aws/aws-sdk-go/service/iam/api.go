@@ -1309,6 +1309,14 @@ func (c *IAM) CreateOpenIDConnectProviderRequest(input *CreateOpenIDConnectProvi
 // in a role's trust policy. Such a policy establishes a trust relationship
 // between AWS and the OIDC provider.
 //
+// If you are using an OIDC identity provider from Google, Facebook, or Amazon
+// Cognito, you don't need to create a separate IAM identity provider. These
+// OIDC identity providers are already built-in to AWS and are available for
+// your use. Instead, you can move directly to creating new roles using your
+// identity provider. To learn more, see Creating a role for web identity or
+// OpenID connect federation (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html)
+// in the IAM User Guide.
+//
 // When you create the IAM OIDC provider, you specify the following:
 //
 //    * The URL of the OIDC identity provider (IdP) to trust
@@ -11968,6 +11976,12 @@ func (c *IAM) ListUserTagsRequest(input *ListUserTagsInput) (req *request.Reques
 		Name:       opListUserTags,
 		HTTPMethod: "POST",
 		HTTPPath:   "/",
+		Paginator: &request.Paginator{
+			InputTokens:     []string{"Marker"},
+			OutputTokens:    []string{"Marker"},
+			LimitToken:      "MaxItems",
+			TruncationToken: "IsTruncated",
+		},
 	}
 
 	if input == nil {
@@ -12022,6 +12036,58 @@ func (c *IAM) ListUserTagsWithContext(ctx aws.Context, input *ListUserTagsInput,
 	req.SetContext(ctx)
 	req.ApplyOptions(opts...)
 	return out, req.Send()
+}
+
+// ListUserTagsPages iterates over the pages of a ListUserTags operation,
+// calling the "fn" function with the response data for each page. To stop
+// iterating, return false from the fn function.
+//
+// See ListUserTags method for more information on how to use this operation.
+//
+// Note: This operation can generate multiple requests to a service.
+//
+//    // Example iterating over at most 3 pages of a ListUserTags operation.
+//    pageNum := 0
+//    err := client.ListUserTagsPages(params,
+//        func(page *iam.ListUserTagsOutput, lastPage bool) bool {
+//            pageNum++
+//            fmt.Println(page)
+//            return pageNum <= 3
+//        })
+//
+func (c *IAM) ListUserTagsPages(input *ListUserTagsInput, fn func(*ListUserTagsOutput, bool) bool) error {
+	return c.ListUserTagsPagesWithContext(aws.BackgroundContext(), input, fn)
+}
+
+// ListUserTagsPagesWithContext same as ListUserTagsPages except
+// it takes a Context and allows setting request options on the pages.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *IAM) ListUserTagsPagesWithContext(ctx aws.Context, input *ListUserTagsInput, fn func(*ListUserTagsOutput, bool) bool, opts ...request.Option) error {
+	p := request.Pagination{
+		NewRequest: func() (*request.Request, error) {
+			var inCpy *ListUserTagsInput
+			if input != nil {
+				tmp := *input
+				inCpy = &tmp
+			}
+			req, _ := c.ListUserTagsRequest(inCpy)
+			req.SetContext(ctx)
+			req.ApplyOptions(opts...)
+			return req, nil
+		},
+	}
+
+	for p.Next() {
+		if !fn(p.Page().(*ListUserTagsOutput), !p.HasNextPage()) {
+			break
+		}
+	}
+
+	return p.Err()
 }
 
 const opListUsers = "ListUsers"
