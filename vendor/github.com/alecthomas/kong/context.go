@@ -324,6 +324,21 @@ func (c *Context) Reset() error {
 	})
 }
 
+func (c *Context) endParsing() {
+	args := []string{}
+	for {
+		token := c.scan.Pop()
+		if token.Type == EOLToken {
+			break
+		}
+		args = append(args, token.String())
+	}
+	// Note: tokens must be pushed in reverse order.
+	for i := range args {
+		c.scan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)
+	}
+}
+
 func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo
 	positional := 0
 
@@ -349,18 +364,7 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo
 				// Indicates end of parsing. All remaining arguments are treated as positional arguments only.
 				case v == "--":
 					c.scan.Pop()
-					args := []string{}
-					for {
-						token = c.scan.Pop()
-						if token.Type == EOLToken {
-							break
-						}
-						args = append(args, token.String())
-					}
-					// Note: tokens must be pushed in reverse order.
-					for i := range args {
-						c.scan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)
-					}
+					c.endParsing()
 
 				// Long flag.
 				case strings.HasPrefix(v, "--"):
@@ -413,6 +417,11 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo
 			// Ensure we've consumed all positional arguments.
 			if positional < len(node.Positional) {
 				arg := node.Positional[positional]
+
+				if arg.Passthrough {
+					c.endParsing()
+				}
+
 				err := arg.Parse(c.scan, c.getValue(arg))
 				if err != nil {
 					return err
@@ -626,12 +635,7 @@ func (c *Context) Apply() (string, error) {
 			panic("unsupported path ?!")
 		}
 		if value != nil {
-			v := c.getValue(value)
-			if value.Flag != nil && value.Flag.Negated {
-				v.SetBool(!v.Bool())
-			}
-
-			value.Apply(v)
+			value.Apply(c.getValue(value))
 		}
 	}
 
@@ -663,6 +667,11 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {
 				return errors.Errorf("%s; perhaps try %s=%q?", err, flag.ShortSummary(), e.token)
 			}
 			return err
+		}
+		if flag.Negated {
+			value := c.getValue(flag.Value)
+			value.SetBool(!value.Bool())
+			flag.Value.Apply(value)
 		}
 		c.Path = append(c.Path, &Path{Flag: flag})
 		return nil

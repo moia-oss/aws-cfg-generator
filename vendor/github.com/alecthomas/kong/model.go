@@ -146,11 +146,17 @@ func (n *Node) Summary() string {
 		summary += " " + flags
 	}
 	args := []string{}
+	optional := 0
 	for _, arg := range n.Positional {
-		args = append(args, arg.Summary())
+		argSummary := arg.Summary()
+		if arg.Tag.Optional {
+			optional++
+			argSummary = strings.TrimRight(argSummary, "]")
+		}
+		args = append(args, argSummary)
 	}
 	if len(args) != 0 {
-		summary += " " + strings.Join(args, " ")
+		summary += " " + strings.Join(args, " ") + strings.Repeat("]", optional)
 	} else if len(n.Children) > 0 {
 		summary += " <command>"
 	}
@@ -230,6 +236,7 @@ type Value struct {
 	Set          bool   // Set to true when this value is set through some mechanism.
 	Format       string // Formatting directive, if applicable.
 	Position     int    // Position (for positional arguments).
+	Passthrough  bool   // Set to true to stop flag parsing when encountered.
 }
 
 // EnumMap returns a map of the enums in this value.
@@ -296,6 +303,11 @@ func (v *Value) IsBool() bool {
 		return true
 	}
 	return v.Target.Kind() == reflect.Bool
+}
+
+// IsCounter returns true if the value is a counter.
+func (v *Value) IsCounter() bool {
+	return v.Tag.Type == "counter"
 }
 
 // Parse tokens into value, parse, and validate, but do not write to the field.
@@ -377,7 +389,7 @@ func (f *Flag) String() string {
 	if f.Short != 0 {
 		out = fmt.Sprintf("-%c, %s", f.Short, out)
 	}
-	if !f.IsBool() {
+	if !f.IsBool() && !f.IsCounter() {
 		out += "=" + f.FormatPlaceHolder()
 	}
 	return out
@@ -385,6 +397,10 @@ func (f *Flag) String() string {
 
 // FormatPlaceHolder formats the placeholder string for a Flag.
 func (f *Flag) FormatPlaceHolder() string {
+	placeholderHelper, ok := f.Value.Mapper.(PlaceHolderProvider)
+	if ok {
+		return placeholderHelper.PlaceHolder(f)
+	}
 	tail := ""
 	if f.Value.IsSlice() && f.Value.Tag.Sep != -1 {
 		tail += string(f.Value.Tag.Sep) + "..."
