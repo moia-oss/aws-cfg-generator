@@ -43,6 +43,7 @@ func (r *DecodeContext) WithScanner(scan *Scanner) *DecodeContext {
 }
 
 // MapperValue may be implemented by fields in order to provide custom mapping.
+// Mappers may additionally implement PlaceHolderProvider to provide custom placeholder text.
 type MapperValue interface {
 	Decode(ctx *DecodeContext) error
 }
@@ -84,7 +85,7 @@ func (m *binaryUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Val
 	if err != nil {
 		return err
 	}
-	if target.Type().Implements(textUnmarshalerType) {
+	if target.Type().Implements(binaryUnmarshalerType) {
 		return target.Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))
 	}
 	return target.Addr().Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))
