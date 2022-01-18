@@ -41,19 +41,21 @@ const (
 
 // Node is a branch in the CLI. ie. a command or positional argument.
 type Node struct {
-	Type       NodeType
-	Parent     *Node
-	Name       string
-	Help       string // Short help displayed in summaries.
-	Detail     string // Detailed help displayed when describing command/arg alone.
-	Group      *Group
-	Hidden     bool
-	Flags      []*Flag
-	Positional []*Positional
-	Children   []*Node
-	Target     reflect.Value // Pointer to the value in the grammar that this Node is associated with.
-	Tag        *Tag
-	Aliases    []string
+	Type        NodeType
+	Parent      *Node
+	Name        string
+	Help        string // Short help displayed in summaries.
+	Detail      string // Detailed help displayed when describing command/arg alone.
+	Group       *Group
+	Hidden      bool
+	Flags       []*Flag
+	Positional  []*Positional
+	Children    []*Node
+	DefaultCmd  *Node
+	Target      reflect.Value // Pointer to the value in the grammar that this Node is associated with.
+	Tag         *Tag
+	Aliases     []string
+	Passthrough bool // Set to true to stop flag parsing when encountered.
 
 	Argument *Value // Populated when Type is ArgumentNode.
 }
@@ -203,8 +205,12 @@ func (n *Node) Path() (out string) {
 	switch n.Type {
 	case CommandNode:
 		out += " " + n.Name
+		if len(n.Aliases) > 0 {
+			out += fmt.Sprintf(" (%s)", strings.Join(n.Aliases, ","))
+		}
 	case ArgumentNode:
 		out += " " + "<" + n.Name + ">"
+	default:
 	}
 	return strings.TrimSpace(out)
 }
@@ -226,6 +232,8 @@ type Value struct {
 	Flag         *Flag // Nil if positional argument.
 	Name         string
 	Help         string
+	OrigHelp     string // Original help string, without interpolated variables.
+	HasDefault   bool
 	Default      string
 	DefaultValue reflect.Value
 	Enum         string
@@ -312,16 +320,6 @@ func (v *Value) IsCounter() bool {
 
 // Parse tokens into value, parse, and validate, but do not write to the field.
 func (v *Value) Parse(scan *Scanner, target reflect.Value) (err error) {
-	defer func() {
-		if rerr := recover(); rerr != nil {
-			switch rerr := rerr.(type) {
-			case Error:
-				err = errors.Wrap(rerr, v.ShortSummary())
-			default:
-				panic(fmt.Sprintf("mapper %T failed to apply to %s: %s", v.Mapper, v.Summary(), rerr))
-			}
-		}
-	}()
 	err = v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)
 	if err != nil {
 		return errors.Wrap(err, v.ShortSummary())
@@ -361,7 +359,7 @@ func (v *Value) Reset() error {
 			return nil
 		}
 	}
-	if v.Default != "" {
+	if v.HasDefault {
 		return v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: v.Default}), v.Target)
 	}
 	return nil
@@ -376,7 +374,7 @@ type Positional = Value
 type Flag struct {
 	*Value
 	Group       *Group // Logical grouping when displaying. May also be used by configuration loaders to group options logically.
-	Xor         string
+	Xor         []string
 	PlaceHolder string
 	Env         string
 	Short       rune
@@ -405,20 +403,23 @@ func (f *Flag) FormatPlaceHolder() string {
 	if f.Value.IsSlice() && f.Value.Tag.Sep != -1 {
 		tail += string(f.Value.Tag.Sep) + "..."
 	}
-	if f.Default != "" {
+	if f.PlaceHolder != "" {
+		return f.PlaceHolder + tail
+	}
+	if f.HasDefault {
 		if f.Value.Target.Kind() == reflect.String {
 			return strconv.Quote(f.Default) + tail
 		}
 		return f.Default + tail
-	}
-	if f.PlaceHolder != "" {
-		return f.PlaceHolder + tail
 	}
 	if f.Value.IsMap() {
 		if f.Value.Tag.MapSep != -1 {
 			tail = string(f.Value.Tag.MapSep) + "..."
 		}
 		return "KEY=VALUE" + tail
+	}
+	if f.Tag != nil && f.Tag.TypeName != "" {
+		return strings.ToUpper(dashedString(f.Tag.TypeName)) + tail
 	}
 	return strings.ToUpper(f.Name) + tail
 }
