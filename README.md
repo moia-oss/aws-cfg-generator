@@ -125,6 +125,7 @@ REQUIRED
 OPTIONAL
 
 --color="00ff7f"                    The hexcode color that should be set for each profile
+--prd-color="ff0000"                The hexcode color that should be set for each profile which name ends in 'prd' or 'global'
 --use-role-name-in-profile=false    Append the role name to the profile name
 ```
 
