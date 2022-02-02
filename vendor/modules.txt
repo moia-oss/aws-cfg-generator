@@ -56,6 +56,6 @@ github.com/rs/zerolog
 github.com/rs/zerolog/internal/cbor
 github.com/rs/zerolog/internal/json
 github.com/rs/zerolog/log
-# gopkg.in/ini.v1 v1.66.2
+# gopkg.in/ini.v1 v1.66.3
 ## explicit
 gopkg.in/ini.v1
