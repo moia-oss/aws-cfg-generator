@@ -1,7 +1,7 @@
 # github.com/alecthomas/kong v0.4.1
 ## explicit
 github.com/alecthomas/kong
-# github.com/aws/aws-sdk-go v1.43.9
+# github.com/aws/aws-sdk-go v1.44.4
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
