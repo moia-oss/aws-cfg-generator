@@ -3,9 +3,18 @@ GO           := $(GO_PREFIX) go
 LINT_TARGETS ?= $(shell $(GO) list -f '{{.Dir}}' ./... | sed -e"s|${CURDIR}/\(.*\)\$$|\1/...|g" )
 SYSTEM       := $(shell uname -s | tr A-Z a-z)_$(shell uname -m | sed "s/x86_64/amd64/")
 
+ARCHS        := amd64 arm64
+OS_SYSTEMS   := darwin linux windows
+
 # The current version of golangci-lint.
 # See: https://github.com/golangci/golangci-lint/releases
 GOLANGCI_LINT_VERSION := 1.38.0
+
+define NEWLINE
+
+
+endef
+
 
 # Executes the linter on all our go files inside of the project
 .PHONY: lint
@@ -41,6 +50,8 @@ bin/golangci-lint-$(GOLANGCI_LINT_VERSION):
 # Builds binaries for windows, macOS, and linux
 .PHONY: build
 build:
-	GOOS=darwin $(GO) build -o bin/darwin-aws-cfg-generator aws-cfg-generator/main.go
-	GOOS=linux $(GO) build -o bin/linux-aws-cfg-generator aws-cfg-generator/main.go
-	GOOS=windows $(GO) build -o bin/windows-aws-cfg-generator aws-cfg-generator/main.go
+	$(foreach os, $(OS_SYSTEMS), \
+		$(foreach a, $(ARCHS), \
+			env GOOS=$(os) GOARCH=$(a) CGO_ENABLED=0 $(GO) build -o bin/$(os)-$(a)-aws-cfg-generator aws-cfg-generator/main.go; $(NEWLINE) \
+		) \
+	)
