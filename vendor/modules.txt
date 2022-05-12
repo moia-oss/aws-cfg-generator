@@ -1,8 +1,8 @@
-# github.com/alecthomas/kong v0.4.1
-## explicit
+# github.com/alecthomas/kong v0.5.0
+## explicit; go 1.13
 github.com/alecthomas/kong
-# github.com/aws/aws-sdk-go v1.43.9
-## explicit
+# github.com/aws/aws-sdk-go v1.44.12
+## explicit; go 1.11
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
 github.com/aws/aws-sdk-go/aws/awserr
@@ -47,11 +47,13 @@ github.com/aws/aws-sdk-go/service/sso/ssoiface
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/jmespath/go-jmespath v0.4.0
+## explicit; go 1.14
 github.com/jmespath/go-jmespath
 # github.com/pkg/errors v0.9.1
+## explicit
 github.com/pkg/errors
 # github.com/rs/zerolog v1.26.1
-## explicit
+## explicit; go 1.15
 github.com/rs/zerolog
 github.com/rs/zerolog/internal/cbor
 github.com/rs/zerolog/internal/json
