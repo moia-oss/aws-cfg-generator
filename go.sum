@@ -2,8 +2,8 @@ github.com/alecthomas/kong v0.5.0 h1:u8Kdw+eeml93qtMZ04iei0CFYve/WPcA5IFh+9wSskE
 github.com/alecthomas/kong v0.5.0/go.mod h1:uzxf/HUh0tj43x1AyJROl3JT7SgsZ5m+icOv1csRhc0=
 github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142 h1:8Uy0oSf5co/NZXje7U1z8Mpep++QJOldL2hs/sBQf48=
 github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142/go.mod h1:2kn6fqh/zIyPLmm3ugklbEi5hg5wS435eygvNfaDQL8=
-github.com/aws/aws-sdk-go v1.44.12 h1:5f7ESFKQv5WHX8m37H2T8G+tc/rggy7sfdZ8ioqXFY8=
-github.com/aws/aws-sdk-go v1.44.12/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
+github.com/aws/aws-sdk-go v1.44.26 h1:fOvltAUcUA3IFe0ddPSlmCBSwPKifsXJf4beI0f8XS0=
+github.com/aws/aws-sdk-go v1.44.26/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
 github.com/coreos/go-systemd/v22 v22.3.2/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
