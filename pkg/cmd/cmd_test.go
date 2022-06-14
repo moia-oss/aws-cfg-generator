@@ -18,7 +18,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -319,10 +318,10 @@ Got
 }
 
 func getFile(filename string) string {
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		panic(err)
 	}
 
-	return strings.TrimSuffix(string(content), "\n")
+	return string(content)
 }
