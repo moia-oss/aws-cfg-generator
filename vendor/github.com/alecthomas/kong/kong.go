@@ -1,6 +1,7 @@
 package kong
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -250,13 +251,13 @@ func (k *Kong) Parse(args []string) (ctx *Context, err error) {
 	if ctx.Error != nil {
 		return nil, &ParseError{error: ctx.Error, Context: ctx}
 	}
-	if err = ctx.Reset(); err != nil {
-		return nil, &ParseError{error: err, Context: ctx}
-	}
 	if err = k.applyHook(ctx, "BeforeResolve"); err != nil {
 		return nil, &ParseError{error: err, Context: ctx}
 	}
 	if err = ctx.Resolve(); err != nil {
+		return nil, &ParseError{error: err, Context: ctx}
+	}
+	if err = ctx.Reset(); err != nil {
 		return nil, &ParseError{error: err, Context: ctx}
 	}
 	if err = k.applyHook(ctx, "BeforeApply"); err != nil {
@@ -378,13 +379,14 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {
 		msg = fmt.Sprintf(args[0].(string), args[1:]...) + ": " + err.Error()
 	}
 	// Maybe display usage information.
-	if err, ok := err.(*ParseError); ok {
+	var parseErr *ParseError
+	if errors.As(err, &parseErr) {
 		switch k.usageOnError {
 		case fullUsage:
-			_ = k.help(k.helpOptions, err.Context)
+			_ = k.help(k.helpOptions, parseErr.Context)
 			fmt.Fprintln(k.Stdout)
 		case shortUsage:
-			_ = k.shortHelp(k.helpOptions, err.Context)
+			_ = k.shortHelp(k.helpOptions, parseErr.Context)
 			fmt.Fprintln(k.Stdout)
 		}
 	}
