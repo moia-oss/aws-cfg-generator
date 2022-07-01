@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/alecthomas/kong v0.6.0
-	github.com/aws/aws-sdk-go v1.44.33
+	github.com/aws/aws-sdk-go v1.44.47
 	github.com/rs/zerolog v1.27.0
 	gopkg.in/ini.v1 v1.66.6
 )
