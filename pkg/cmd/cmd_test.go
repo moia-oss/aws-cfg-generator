@@ -66,7 +66,7 @@ include_profile = default
 					KeepCustomConfig:     false,
 					UseRoleNameInProfile: false,
 					Region:               "",
-				})
+				}, true)
 			},
 		},
 		{
@@ -87,7 +87,7 @@ include_profile = default
 					KeepCustomConfig:     false,
 					UseRoleNameInProfile: false,
 					Region:               "",
-				})
+				}, true)
 			},
 		},
 		{
@@ -108,7 +108,7 @@ include_profile = default
 					KeepCustomConfig:     false,
 					UseRoleNameInProfile: false,
 					Region:               "",
-				})
+				}, true)
 			},
 		},
 		{
@@ -129,7 +129,7 @@ include_profile = my-profile
 					KeepCustomConfig:     false,
 					UseRoleNameInProfile: false,
 					Region:               "",
-				})
+				}, true)
 			},
 		},
 		{
@@ -150,7 +150,7 @@ include_profile = default
 					KeepCustomConfig:     false,
 					UseRoleNameInProfile: true,
 					Region:               "",
-				})
+				}, true)
 			},
 		},
 		{
@@ -185,7 +185,7 @@ include_profile = default
 					KeepCustomConfig:     true,
 					UseRoleNameInProfile: true,
 					Region:               "",
-				})
+				}, true)
 			},
 		},
 		{
@@ -217,7 +217,7 @@ include_profile = default
 					KeepCustomConfig:     false,
 					UseRoleNameInProfile: true,
 					Region:               "",
-				})
+				}, true)
 			},
 		},
 		{
@@ -239,7 +239,7 @@ region          = eu-central-1
 					KeepCustomConfig:     false,
 					UseRoleNameInProfile: true,
 					Region:               "eu-central-1",
-				})
+				}, true)
 			},
 		},
 		{
@@ -256,7 +256,7 @@ color          = ffffff
 					OutputFile:           filename,
 					UseRoleNameInProfile: false,
 					Color:                "ffffff",
-				})
+				}, true)
 			},
 		},
 		{
@@ -273,7 +273,7 @@ color          = ffffff
 					OutputFile:           filename,
 					UseRoleNameInProfile: true,
 					Color:                "ffffff",
-				})
+				}, true)
 			},
 		},
 		{
@@ -290,7 +290,7 @@ color          = ffffff
 					OutputFile:           filename,
 					UseRoleNameInProfile: false,
 					Color:                "ffffff",
-				})
+				}, true)
 			},
 		},
 	}
@@ -299,7 +299,12 @@ color          = ffffff
 		t.Run(fmt.Sprintf("%s %s", testCase.describe, testCase.it), func(t *testing.T) {
 
 			filename := setup(testCase.originalConfig)
-			defer os.Remove(filename)
+			defer func() {
+				err := os.Remove(filename)
+				if err != nil {
+					log.Panic(err)
+				}
+			}()
 
 			testCase.run(filename)
 
