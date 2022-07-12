@@ -8,7 +8,7 @@ OS_SYSTEMS   := darwin linux windows
 
 # The current version of golangci-lint.
 # See: https://github.com/golangci/golangci-lint/releases
-GOLANGCI_LINT_VERSION := 1.38.0
+GOLANGCI_LINT_VERSION := 1.46.2
 
 define NEWLINE
 
