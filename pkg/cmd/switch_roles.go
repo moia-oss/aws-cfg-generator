@@ -33,7 +33,7 @@ type SwitchRolesCmd struct {
 
 func (swc *SwitchRolesCmd) Run(cli *CLI) error {
 	roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts(cli.Role)
-	generateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles)
+	generateSwitchRolesProfile(accountMap, roleArns, cli.SwitchRoles, cli.Ordered)
 
 	return nil
 }
@@ -56,10 +56,16 @@ func envSpecificColor(profileName string, cmdOptions SwitchRolesCmd) string {
 	return cmdOptions.Color
 }
 
-func generateSwitchRolesProfile(accountMap map[string]string, roleArns []string, cmdOptions SwitchRolesCmd) {
+func generateSwitchRolesProfile(accountMap map[string]string, roleArns []string, cmdOptions SwitchRolesCmd, ordered bool) {
 	config := ini.Empty()
 
-	for _, profile := range util.GetProfiles("", accountMap, roleArns, cmdOptions.UseRoleNameInProfile) {
+	profiles := util.GetProfiles("", accountMap, roleArns, cmdOptions.UseRoleNameInProfile)
+
+	if ordered {
+		profiles = util.OrderProfiles(profiles)
+	}
+
+	for _, profile := range profiles {
 		profileSection := config.Section(profile.ProfileName)
 
 		setKey := util.GetKeySetter(profileSection)
