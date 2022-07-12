@@ -24,6 +24,8 @@ import (
 // nolint:govet // we need the bare `required` tag here
 type SwitchRolesCmd struct {
 	Color                string `help:"The hexcode color that should be set for each profile which name doesn't end in 'prd' or 'global'" default:"00ff7f"`
+	DevColor             string `help:"The hexcode color that should be set for each profile which name ends in 'dev' or 'poc'" default:"00d619"`
+	IntColor             string `help:"The hexcode color that should be set for each profile which name ends in 'int' or 'stg'" default:"ffea00"`
 	PrdColor             string `help:"The hexcode color that should be set for each profile which name ends in 'prd' or 'global'" default:"ff0000"`
 	OutputFile           string `help:"Where to save the config." required`
 	UseRoleNameInProfile bool   `help:"Append the role name to the profile name" default:false`
@@ -38,6 +40,14 @@ func (swc *SwitchRolesCmd) Run(cli *CLI) error {
 
 func envSpecificColor(profileName string, cmdOptions SwitchRolesCmd) string {
 	lowerKeyProfileName := strings.ToLower(profileName)
+
+	if strings.HasSuffix(lowerKeyProfileName, "dev") || strings.HasSuffix(lowerKeyProfileName, "poc") {
+		return cmdOptions.DevColor
+	}
+
+	if strings.HasSuffix(lowerKeyProfileName, "int") || strings.HasSuffix(lowerKeyProfileName, "stg") {
+		return cmdOptions.IntColor
+	}
 
 	if strings.HasSuffix(lowerKeyProfileName, "prd") || strings.HasSuffix(lowerKeyProfileName, "global") {
 		return cmdOptions.PrdColor
