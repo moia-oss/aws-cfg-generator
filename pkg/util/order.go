@@ -18,6 +18,8 @@ import (
 	"strings"
 )
 
+var stages = []string{"poc", "stg", "dev", "int", "prd"}
+
 func profileLess(x, y Profile) bool {
 	return x.ProfileName < y.ProfileName
 }
@@ -25,19 +27,26 @@ func profileLess(x, y Profile) bool {
 func OrderProfiles(unorderedProfiles []Profile) []Profile {
 	var singleProfiles, stagedProfiles []Profile
 
-	stages := []string{"poc", "stg", "dev", "int", "prd"}
-
 	for _, profile := range unorderedProfiles {
-		for _, stage := range stages {
-			if strings.HasSuffix(profile.ProfileName, stage) {
-				stagedProfiles = append(stagedProfiles, profile)
-			} else {
-				singleProfiles = append(singleProfiles, profile)
-			}
+		if isStageProfile(profile) {
+			stagedProfiles = append(stagedProfiles, profile)
+		} else {
+			singleProfiles = append(singleProfiles, profile)
 		}
+
 	}
+
 	slices.SortFunc(singleProfiles, profileLess)
 	slices.SortFunc(stagedProfiles, profileLess)
 
 	return append(singleProfiles, stagedProfiles...)
+}
+
+func isStageProfile(profile Profile) bool {
+	for _, stage := range stages {
+		if strings.HasSuffix(profile.ProfileName, stage) {
+			return true
+		}
+	}
+	return false
 }
