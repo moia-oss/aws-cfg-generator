@@ -32,12 +32,12 @@ type VaultCmd struct {
 
 func (vc *VaultCmd) Run(cli *CLI) error {
 	roleArns, accountMap := util.GetAWSContext().GetRolesAndAccounts(cli.Role)
-	generateVaultProfile(accountMap, roleArns, cli.Vault)
+	generateVaultProfile(accountMap, roleArns, cli.Vault, cli.Ordered)
 
 	return nil
 }
 
-func generateVaultProfile(accountMap map[string]string, roleArns []string, cmdOptions VaultCmd) {
+func generateVaultProfile(accountMap map[string]string, roleArns []string, cmdOptions VaultCmd, ordered bool) {
 	config, err := ini.Load(cmdOptions.VaultConfigPath)
 	if err != nil {
 		log.Panic().Err(err).Str("file-path", cmdOptions.VaultConfigPath).Msg("could not load config")
@@ -68,8 +68,13 @@ func generateVaultProfile(accountMap map[string]string, roleArns []string, cmdOp
 
 		config = newConfig
 	}
+	profiles := util.GetProfiles("profile ", accountMap, roleArns, cmdOptions.UseRoleNameInProfile)
 
-	for _, profile := range util.GetProfiles("profile ", accountMap, roleArns, cmdOptions.UseRoleNameInProfile) {
+	if ordered {
+		profiles = util.OrderProfiles(profiles)
+	}
+
+	for _, profile := range profiles {
 		profileSection := config.Section(profile.ProfileName)
 
 		setKey := util.GetKeySetter(profileSection)
