@@ -89,6 +89,7 @@ OPTIONAL
                                    except the source profile and generated config
 --use-role-name-in-profile=false   Append the role name to the profile name
 --role=STRING                      If set, then a profile with this role will be generated for every account in the organization, in addition to the roles that the user has permissions to assume
+--ordered=true                     Saves the profiles according to alphabetical order, stage, and uniqueness
 ```
 
 Note: When using the `--role` flag we do not check to see if the user has permission to assume that role. This is useful
@@ -125,6 +126,8 @@ REQUIRED
 OPTIONAL
 
 --color="00ff7f"                    The hexcode color that should be set for each profile
+--dev-color="00d619"                The hexcode color that should be set for each profile which name ends in 'dev' or 'poc'
+--int-color="ffea00"                The hexcode color that should be set for each profile which name ends in 'int' or 'stg'
 --prd-color="ff0000"                The hexcode color that should be set for each profile which name ends in 'prd' or 'global'
 --use-role-name-in-profile=false    Append the role name to the profile name
 ```
