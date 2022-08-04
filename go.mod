@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/alecthomas/kong v0.6.1
-	github.com/aws/aws-sdk-go v1.44.53
+	github.com/aws/aws-sdk-go v1.44.67
 	github.com/rs/zerolog v1.27.0
 	golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983
 	gopkg.in/ini.v1 v1.66.6
