@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.67
 	github.com/rs/zerolog v1.27.0
 	golang.org/x/exp v0.0.0-20220706164943-b4a6d9510983
-	gopkg.in/ini.v1 v1.66.6
+	gopkg.in/ini.v1 v1.67.0
 )
 
 require (
