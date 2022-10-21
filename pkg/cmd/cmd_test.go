@@ -15,14 +15,13 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
 )
 
 func setup(configFileContents string) (filename string) {
-	file, err := ioutil.TempFile("", "aws-config")
+	file, err := os.CreateTemp("", "aws-config")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -297,7 +296,6 @@ color          = ffffff
 
 	for _, testCase := range testCases {
 		t.Run(fmt.Sprintf("%s %s", testCase.describe, testCase.it), func(t *testing.T) {
-
 			filename := setup(testCase.originalConfig)
 			defer func() {
 				err := os.Remove(filename)
