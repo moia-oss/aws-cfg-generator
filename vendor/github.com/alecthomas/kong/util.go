@@ -17,7 +17,7 @@ func (c ConfigFlag) BeforeResolve(kong *Kong, ctx *Context, trace *Path) error {
 	if kong.loader == nil {
 		return fmt.Errorf("kong must be configured with kong.Configuration(...)")
 	}
-	path := string(ctx.FlagValue(trace.Flag).(ConfigFlag))
+	path := string(ctx.FlagValue(trace.Flag).(ConfigFlag)) // nolint
 	resolver, err := kong.LoadConfig(path)
 	if err != nil {
 		return err
@@ -29,8 +29,8 @@ func (c ConfigFlag) BeforeResolve(kong *Kong, ctx *Context, trace *Path) error {
 // VersionFlag is a flag type that can be used to display a version number, stored in the "version" variable.
 type VersionFlag bool
 
-// BeforeApply writes the version variable and terminates with a 0 exit status.
-func (v VersionFlag) BeforeApply(app *Kong, vars Vars) error {
+// BeforeReset writes the version variable and terminates with a 0 exit status.
+func (v VersionFlag) BeforeReset(app *Kong, vars Vars) error {
 	fmt.Fprintln(app.Stdout, vars["version"])
 	app.Exit(0)
 	return nil

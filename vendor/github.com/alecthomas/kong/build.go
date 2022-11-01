@@ -158,6 +158,11 @@ MAIN:
 		}
 	}
 
+	// Validate if there are no duplicate names
+	if err := checkDuplicateNames(node, v); err != nil {
+		return nil, err
+	}
+
 	// "Unsee" flags.
 	for _, flag := range node.Flags {
 		delete(seenFlags, "--"+flag.Name)
@@ -166,17 +171,33 @@ MAIN:
 		}
 	}
 
-	// Scan through argument positionals to ensure optional is never before a required.
+	if err := validatePositionalArguments(node); err != nil {
+		return nil, err
+	}
+
+	return node, nil
+}
+
+func validatePositionalArguments(node *Node) error {
 	var last *Value
 	for i, curr := range node.Positional {
-		if last != nil && !last.Required && curr.Required {
-			return nil, fmt.Errorf("%s: required %q can not come after optional %q", node.FullPath(), curr.Name, last.Name)
+		if last != nil {
+			// Scan through argument positionals to ensure optional is never before a required.
+			if !last.Required && curr.Required {
+				return fmt.Errorf("%s: required %q cannot come after optional %q", node.FullPath(), curr.Name, last.Name)
+			}
+
+			// Cumulative argument needs to be last.
+			if last.IsCumulative() {
+				return fmt.Errorf("%s: argument %q cannot come after cumulative %q", node.FullPath(), curr.Name, last.Name)
+			}
 		}
+
 		last = curr
 		curr.Position = i
 	}
 
-	return node, nil
+	return nil
 }
 
 func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) error {
@@ -310,4 +331,21 @@ func buildGroupForKey(k *Kong, key string) *Group {
 		Key:   key,
 		Title: key,
 	}
+}
+
+func checkDuplicateNames(node *Node, v reflect.Value) error {
+	seenNames := make(map[string]struct{})
+	for _, node := range node.Children {
+		if _, ok := seenNames[node.Name]; ok {
+			name := v.Type().Name()
+			if name == "" {
+				name = "<anonymous struct>"
+			}
+			return fmt.Errorf("duplicate command name %q in command %q", node.Name, name)
+		}
+
+		seenNames[node.Name] = struct{}{}
+	}
+
+	return nil
 }
