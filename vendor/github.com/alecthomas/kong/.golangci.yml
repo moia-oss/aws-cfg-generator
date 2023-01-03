@@ -36,6 +36,11 @@ linters:
     - thelper
     - godox
     - goconst
+    - varnamelen
+    - ireturn
+    - exhaustruct
+    - nonamedreturns
+    - nilnil
 
 linters-settings:
   govet:
@@ -60,3 +65,4 @@ issues:
     - 'bad syntax for struct tag key'
     - 'bad syntax for struct tag pair'
     - 'result .* \(error\) is always nil'
+    - 'package io/ioutil is deprecated'
