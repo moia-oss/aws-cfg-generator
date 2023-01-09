@@ -53,9 +53,9 @@ type mapperValueAdapter struct {
 
 func (m *mapperValueAdapter) Decode(ctx *DecodeContext, target reflect.Value) error {
 	if target.Type().Implements(mapperValueType) {
-		return target.Interface().(MapperValue).Decode(ctx)
+		return target.Interface().(MapperValue).Decode(ctx) // nolint
 	}
-	return target.Addr().Interface().(MapperValue).Decode(ctx)
+	return target.Addr().Interface().(MapperValue).Decode(ctx) // nolint
 }
 
 func (m *mapperValueAdapter) IsBool() bool {
@@ -71,9 +71,9 @@ func (m *textUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Value
 		return err
 	}
 	if target.Type().Implements(textUnmarshalerType) {
-		return target.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(value))
+		return target.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(value)) // nolint
 	}
-	return target.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(value))
+	return target.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(value)) // nolint
 }
 
 type binaryUnmarshalerAdapter struct{}
@@ -85,9 +85,9 @@ func (m *binaryUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Val
 		return err
 	}
 	if target.Type().Implements(binaryUnmarshalerType) {
-		return target.Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))
+		return target.Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value)) // nolint
 	}
-	return target.Addr().Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))
+	return target.Addr().Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value)) // nolint
 }
 
 type jsonUnmarshalerAdapter struct{}
@@ -99,9 +99,9 @@ func (j *jsonUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Value
 		return err
 	}
 	if target.Type().Implements(jsonUnmarshalerType) {
-		return target.Interface().(json.Unmarshaler).UnmarshalJSON([]byte(value))
+		return target.Interface().(json.Unmarshaler).UnmarshalJSON([]byte(value)) // nolint
 	}
-	return target.Addr().Interface().(json.Unmarshaler).UnmarshalJSON([]byte(value))
+	return target.Addr().Interface().(json.Unmarshaler).UnmarshalJSON([]byte(value)) // nolint
 }
 
 // A Mapper represents how a field is mapped from command-line values to Go.
@@ -274,7 +274,8 @@ func (r *Registry) RegisterDefaults() *Registry {
 		RegisterName("path", pathMapper(r)).
 		RegisterName("existingfile", existingFileMapper(r)).
 		RegisterName("existingdir", existingDirMapper(r)).
-		RegisterName("counter", counterMapper())
+		RegisterName("counter", counterMapper()).
+		RegisterKind(reflect.Ptr, ptrMapper(r))
 }
 
 type boolMapper struct{}
@@ -362,8 +363,11 @@ func intDecoder(bits int) MapperFunc { // nolint: dupl
 		case string:
 			sv = v
 
-		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 			sv = fmt.Sprintf("%v", v)
+
+		case float32, float64:
+			sv = fmt.Sprintf("%0.f", v)
 
 		default:
 			return fmt.Errorf("expected an int but got %q (%T)", t, t.Value)
@@ -388,8 +392,11 @@ func uintDecoder(bits int) MapperFunc { // nolint: dupl
 		case string:
 			sv = v
 
-		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 			sv = fmt.Sprintf("%v", v)
+
+		case float32, float64:
+			sv = fmt.Sprintf("%0.f", v)
 
 		default:
 			return fmt.Errorf("expected an int but got %q (%T)", t, t.Value)
@@ -613,7 +620,7 @@ func existingFileMapper(r *Registry) MapperFunc {
 			return err
 		}
 
-		if ctx.Value.Set {
+		if !ctx.Value.Active || ctx.Value.Set {
 			// early return to avoid checking extra files that may not exist;
 			// this hack only works because the value provided on the cli is
 			// checked before the default value is checked (if default is set).
@@ -649,7 +656,7 @@ func existingDirMapper(r *Registry) MapperFunc {
 			return err
 		}
 
-		if ctx.Value.Set {
+		if !ctx.Value.Active || ctx.Value.Set {
 			// early return to avoid checking extra dirs that may not exist;
 			// this hack only works because the value provided on the cli is
 			// checked before the default value is checked (if default is set).
@@ -665,6 +672,22 @@ func existingDirMapper(r *Registry) MapperFunc {
 			return fmt.Errorf("%q exists but is not a directory", path)
 		}
 		target.SetString(path)
+		return nil
+	}
+}
+
+func ptrMapper(r *Registry) MapperFunc {
+	return func(ctx *DecodeContext, target reflect.Value) error {
+		elem := reflect.New(target.Type().Elem()).Elem()
+		nestedMapper := r.ForValue(elem)
+		if nestedMapper == nil {
+			return fmt.Errorf("cannot find mapper for %v", target.Type().Elem().String())
+		}
+		err := nestedMapper.Decode(ctx, elem)
+		if err != nil {
+			return err
+		}
+		target.Set(elem.Addr())
 		return nil
 	}
 }
