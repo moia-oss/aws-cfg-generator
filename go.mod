@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/alecthomas/kong v0.7.1
 	github.com/aws/aws-sdk-go v1.44.171
-	github.com/rs/zerolog v1.28.0
+	github.com/rs/zerolog v1.29.0
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91
 	gopkg.in/ini.v1 v1.67.0
 )
