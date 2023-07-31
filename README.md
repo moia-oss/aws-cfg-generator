@@ -1,4 +1,10 @@
-# aws-cfg-generator
+# aws-cfg-generator (ARCHIVED)
+
+## Deprecation notice: this repo is archived and read-only
+
+As of 31.07.2023, this repository will be archived and set to read-only. This means that while the existing code and resources will remain accessible, no further updates, enhancements, or bug fixes will be provided. We understand that this decision may impact some of your workflows and projects, and we apologize for any inconvenience it may cause.
+
+## About
 
 aws-cfg-generator is a CLI tool to generate configs for AWS helper tools based on an IAM user's permissions.
 
